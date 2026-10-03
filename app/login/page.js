@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Lock, User, Eye, EyeOff, Loader2, AlertCircle, Info } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { LOGO_URL, APP_NAME, APP_DESCRIPTION, FOOTER_TEXT } from '../../lib/config.js';
 
 export default function LoginPage() {
@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [showDemoCreds, setShowDemoCreds] = useState(false);
+
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -62,12 +62,6 @@ export default function LoginPage() {
       toast.error('Gagal terhubung ke server');
       setIsLoading(false);
     }
-  }
-
-  function fillCreds(u, p) {
-    setUsername(u);
-    setPassword(p);
-    setErrorMessage('');
   }
 
   return (
@@ -171,56 +165,11 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credentials Guide */}
-          <div className="mt-6 pt-5 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setShowDemoCreds(!showDemoCreds)}
-              className="w-full flex items-center justify-between text-xs text-gray-500 hover:text-[#0056b3] font-semibold py-1"
-            >
-              <span className="flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5" />
-                Informasi Akun Default
-              </span>
-              <span>{showDemoCreds ? 'Sembunyikan' : 'Tampilkan'}</span>
-            </button>
-
-            {showDemoCreds && (
-              <div className="mt-3 p-3 bg-blue-50/50 rounded-xl text-xs space-y-2 border border-blue-100">
-                <p className="text-gray-600 font-medium">Klik akun untuk mengisi otomatis:</p>
-                <div className="grid grid-cols-1 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => fillCreds('admin.pusat', 'Admin123!')}
-                    className="p-2 text-left bg-white rounded-lg border border-gray-200 hover:border-[#0056b3] flex justify-between items-center transition-colors"
-                  >
-                    <div>
-                      <div className="font-bold text-gray-800">Admin Pusat</div>
-                      <div className="text-[11px] text-gray-500 font-mono">admin.pusat / Admin123!</div>
-                    </div>
-                    <span className="text-[10px] font-bold text-[#0056b3] uppercase">Pilih</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => fillCreds('admin.sby', 'Admin123!')}
-                    className="p-2 text-left bg-white rounded-lg border border-gray-200 hover:border-[#0056b3] flex justify-between items-center transition-colors"
-                  >
-                    <div>
-                      <div className="font-bold text-gray-800">Admin Surabaya</div>
-                      <div className="text-[11px] text-gray-500 font-mono">admin.sby / Admin123!</div>
-                    </div>
-                    <span className="text-[10px] font-bold text-[#0056b3] uppercase">Pilih</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
       <footer className="mt-6 text-xs text-gray-500 text-center font-medium">
+
         <p>{FOOTER_TEXT}</p>
       </footer>
     </div>
