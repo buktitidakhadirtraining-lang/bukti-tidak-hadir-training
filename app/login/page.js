@@ -3,13 +3,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Lock, User, Eye, EyeOff, Loader2, AlertCircle, Info } from 'lucide-react';
 import { LOGO_URL, APP_NAME, APP_DESCRIPTION, FOOTER_TEXT } from '../../lib/config.js';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -42,21 +40,26 @@ export default function LoginPage() {
       if (!res.ok || !data.ok) {
         setErrorMessage(data.error || 'Username atau password salah');
         toast.error(data.error || 'Gagal masuk');
+        setIsLoading(false);
         return;
       }
 
       toast.success(`Selamat datang, ${data.data?.fullName || data.data?.username}!`);
 
-      if (data.data?.mustChangePassword) {
-        toast.warning('Anda harus mengganti password awal demi keamanan akun');
-        router.push('/akun?change_required=true');
-      } else {
-        router.push('/dashboard');
-      }
+      // Mengambil target redirect dari URL query atau default ke /dashboard
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const targetUrl = urlParams?.get('redirect') || '/dashboard';
+
+      setTimeout(() => {
+        if (data.data?.mustChangePassword) {
+          window.location.href = '/akun?change_required=true';
+        } else {
+          window.location.href = targetUrl;
+        }
+      }, 250);
     } catch (err) {
       setErrorMessage('Terjadi kesalahan jaringan. Silakan periksa koneksi Anda.');
       toast.error('Gagal terhubung ke server');
-    } finally {
       setIsLoading(false);
     }
   }

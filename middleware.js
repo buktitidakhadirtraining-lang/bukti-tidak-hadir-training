@@ -5,7 +5,7 @@ import { jwtVerify } from 'jose';
 const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/meta'];
 
 export async function middleware(request) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
 
   // Lewati static assets, favicon, API, dll
   if (
@@ -17,24 +17,31 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get('session_token')?.value;
+  const token =
+    request.cookies.get('auth_token')?.value ||
+    request.cookies.get('session_token')?.value;
+
   let isAuthenticated = false;
 
   if (token) {
     try {
       const secret = new TextEncoder().encode(
-        process.env.SESSION_SECRET || 'kunci_rahasia_jwt_session_training_2026_default_secret_32_chars'
+        process.env.SESSION_SECRET || 'sistem_ketidakhadiran_training_session_secret_default_key_2026_xyz_auth_32'
       );
       await jwtVerify(token, secret);
       isAuthenticated = true;
-    } catch {
+    } catch (e) {
       isAuthenticated = false;
     }
   }
 
   // Jika di halaman /login dan sudah login, arahkan ke /dashboard
-  if (pathname === '/login' && isAuthenticated) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  if (pathname === '/login') {
+    if (isAuthenticated) {
+      const redirectUrl = searchParams.get('redirect') || '/dashboard';
+      return NextResponse.redirect(new URL(redirectUrl, request.url));
+    }
+    return NextResponse.next();
   }
 
   // Jika di root / arahkan ke /dashboard jika login atau ke /login jika belum
