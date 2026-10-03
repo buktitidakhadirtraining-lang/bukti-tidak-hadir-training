@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { LOGO_URL, formatDateIndo } from '../../../lib/config.js';
 
-// Komponen gambar bukti yang aman dan tidak memicu re-render loop
+// Komponen gambar bukti yang tajam dan aman
 function ProofImage({ recordId, src, alt, onLoaded }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -25,8 +25,11 @@ function ProofImage({ recordId, src, alt, onLoaded }) {
       src={src}
       alt={alt}
       crossOrigin="anonymous"
-      loading="lazy"
-      className="max-h-[140px] max-w-full object-contain mx-auto"
+      className="max-h-[175px] max-w-full w-auto h-auto object-contain mx-auto"
+      style={{
+        imageRendering: 'auto',
+        WebkitPrintColorAdjust: 'exact',
+      }}
       onLoad={() => onLoaded && onLoaded(recordId)}
       onError={() => onLoaded && onLoaded(recordId)}
     />
@@ -160,12 +163,15 @@ export default function CetakPage() {
       const filename = `${docType}${branchName}${period}.pdf`;
 
       const opt = {
-        margin: [8, 8, 8, 8],
+        margin: [6, 6, 6, 6],
         filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: 'jpeg', quality: 1.0 },
         html2canvas: {
-          scale: 2,
+          scale: 3.5, // Rendering Ultra-HD 300+ DPI
+          dpi: 300,
+          letterRendering: true,
           useCORS: true,
+          allowTaint: true,
           logging: false,
           backgroundColor: '#ffffff',
           scrollY: 0,
@@ -174,6 +180,7 @@ export default function CetakPage() {
           unit: 'mm',
           format: 'a4',
           orientation: 'landscape',
+          compress: true,
         },
         pagebreak: { mode: ['css', 'legacy'] },
       };
@@ -663,9 +670,9 @@ export default function CetakPage() {
                                     style={{
                                       border: '1px solid #000000',
                                       width: '25%',
-                                      height: '150px',
-                                      minHeight: '150px',
-                                      maxHeight: '160px',
+                                      height: '175px',
+                                      minHeight: '175px',
+                                      maxHeight: '185px',
                                     }}
                                   >
                                     {!item ? (
