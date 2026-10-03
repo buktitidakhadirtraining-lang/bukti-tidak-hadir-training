@@ -163,11 +163,11 @@ export default function CetakPage() {
       const filename = `${docType}${branchName}${period}.pdf`;
 
       const opt = {
-        margin: [6, 6, 6, 6],
+        margin: [5, 5, 5, 5],
         filename: filename,
-        image: { type: 'jpeg', quality: 1.0 },
+        image: { type: 'png' }, // Lossless PNG untuk ketajaman tulisan 100% tanpa noise kompresi
         html2canvas: {
-          scale: 3.5, // Rendering Ultra-HD 300+ DPI
+          scale: 4, // Super Ultra-HD 4K (4x High-Density Pixel Mapping)
           dpi: 300,
           letterRendering: true,
           useCORS: true,
@@ -175,12 +175,15 @@ export default function CetakPage() {
           logging: false,
           backgroundColor: '#ffffff',
           scrollY: 0,
+          scrollX: 0,
+          windowWidth: 1600,
         },
         jsPDF: {
           unit: 'mm',
           format: 'a4',
           orientation: 'landscape',
           compress: true,
+          precision: 16,
         },
         pagebreak: { mode: ['css', 'legacy'] },
       };
@@ -677,15 +680,15 @@ export default function CetakPage() {
                                   >
                                     {!item ? (
                                       // Slot kosong (jika sisa data < 4), garis sel tetap ada
-                                      <div className="h-[142px] w-full" />
+                                      <div className="h-[168px] w-full" />
                                     ) : !item.drive_file_id ? (
                                       // Jika data tidak punya bukti sama sekali
-                                      <div className="h-[142px] w-full flex flex-col items-center justify-center text-gray-400 italic text-[11px]">
+                                      <div className="h-[168px] w-full flex flex-col items-center justify-center text-gray-400 italic text-[11px]">
                                         Tidak ada bukti
                                       </div>
                                     ) : item.file_mime_type === 'application/pdf' ? (
                                       // Jika mime type adalah application/pdf
-                                      <div className="h-[142px] w-full flex flex-col items-center justify-center p-2 text-gray-700 bg-gray-50/60 rounded">
+                                      <div className="h-[168px] w-full flex flex-col items-center justify-center p-2 text-gray-700 bg-gray-50/60 rounded">
                                         <FileText className="w-8 h-8 text-red-500 mb-1" />
                                         <span className="text-[10px] font-bold text-center leading-tight">
                                           Dokumen PDF
@@ -695,7 +698,7 @@ export default function CetakPage() {
                                       </div>
                                     ) : (
                                       // Jika mime type adalah gambar
-                                      <div className="h-[142px] w-full flex items-center justify-center overflow-hidden">
+                                      <div className="h-[168px] w-full flex items-center justify-center overflow-hidden">
                                         <ProofImage
                                           recordId={item.id}
                                           src={`/api/records/${item.id}/file`}
