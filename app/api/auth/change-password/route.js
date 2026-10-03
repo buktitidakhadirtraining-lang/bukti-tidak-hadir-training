@@ -55,7 +55,7 @@ export async function POST(request) {
     }
 
     const strength = validatePasswordStrength(newPassword);
-    if (!strength.valid) {
+    if (!strength.valid && !strength.isValid) {
       return NextResponse.json(
         { ok: false, error: strength.message },
         { status: 400 }

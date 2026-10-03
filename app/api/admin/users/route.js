@@ -64,7 +64,7 @@ export async function POST(request) {
 
     const pwdToUse = initial_password ? initial_password.trim() : 'Indomaret123!';
     const strength = validatePasswordStrength(pwdToUse);
-    if (!strength.valid) {
+    if (!strength.valid && !strength.isValid) {
       return NextResponse.json({ ok: false, error: strength.message }, { status: 400 });
     }
 

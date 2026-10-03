@@ -44,7 +44,7 @@ export async function PUT(request, { params }) {
     if (reset_password) {
       const pwd = reset_password.trim();
       const strength = validatePasswordStrength(pwd);
-      if (!strength.valid) {
+      if (!strength.valid && !strength.isValid) {
         return NextResponse.json({ ok: false, error: strength.message }, { status: 400 });
       }
       updatePayload.password_hash = await hashPassword(pwd);
