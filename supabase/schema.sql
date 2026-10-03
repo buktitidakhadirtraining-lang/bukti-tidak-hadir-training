@@ -143,15 +143,9 @@ alter table absence_records enable row level security;
 alter table audit_logs enable row level security;
 
 -- ==============================================================================
--- 10. SEED DATA AWAL: CABANG STANDAR
+-- 10. CABANG (Dikelola oleh Admin melalui menu Master Cabang)
 -- ==============================================================================
-insert into branches (name, code, is_active) values
-  ('Cabang Jakarta 1', 'JKT1', true),
-  ('Cabang Bandung', 'BDG1', true),
-  ('Cabang Surabaya', 'SBY1', true),
-  ('Cabang Medan', 'MDN1', true),
-  ('Cabang Semarang', 'SMG1', true)
-on conflict (name) do nothing;
+-- Tidak ada cabang demo bawaan. Cabang ditambahkan secara dinamis oleh pengguna.
 
 -- ==============================================================================
 -- 11. SEED DATA AWAL: 16 JENIS TRAINING RESMI
@@ -176,20 +170,22 @@ insert into training_types (name, sort_order, is_active) values
 on conflict (name) do nothing;
 
 -- ==============================================================================
--- 12. SEED DATA AWAL: 10 ALASAN KETIDAKHADIRAN RESMI
+-- 12. SEED DATA AWAL: 11 ALASAN KETIDAKHADIRAN RESMI
 -- ==============================================================================
 insert into absence_reasons (name, sort_order, is_active) values
-  ('Cuti', 1, true),
-  ('Bencana alam', 2, true),
+  ('Bencana alam', 1, true),
+  ('Cuti', 2, true),
   ('Keluarga inti sakit', 3, true),
-  ('Musibah/kecelakaan', 4, true),
-  ('Menggantikan personil lain', 5, true),
-  ('Mangkir', 6, true),
-  ('Mutasi', 7, true),
-  ('Toko tidak jual prodsus', 8, true),
-  ('Sakit', 9, true),
-  ('Resign', 10, true)
+  ('Lain - lain', 4, true),
+  ('Mangkir', 5, true),
+  ('Menggantikan personil lain', 6, true),
+  ('Musibah/kecelakaan', 7, true),
+  ('Mutasi', 8, true),
+  ('Resign', 9, true),
+  ('Sakit', 10, true),
+  ('Toko tidak jual prodsus', 11, true)
 on conflict (name) do nothing;
+
 
 -- ==============================================================================
 -- 13. SEED AKUN PENGGUNA DEFAULT (Password default: Admin123!)

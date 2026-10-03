@@ -343,11 +343,15 @@ export default function InputPage() {
                       required
                       className="w-full pl-9 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#0056b3] min-h-[44px]"
                     >
-                      {meta?.branches?.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.code} - {b.name} {!b.driveReady ? '⚠️ [Drive Belum Terhubung]' : ''}
-                        </option>
-                      ))}
+                      {meta?.branches?.filter((b) => b.is_active !== false)?.length === 0 ? (
+                        <option value="">Belum ada cabang terdaftar (Tambahkan di Master Cabang)</option>
+                      ) : (
+                        meta?.branches?.filter((b) => b.is_active !== false)?.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.code} - {b.name} {!b.driveReady ? '⚠️ [Drive Belum Terhubung]' : ''}
+                          </option>
+                        ))
+                      )}
                     </select>
                   ) : (
                     <input
