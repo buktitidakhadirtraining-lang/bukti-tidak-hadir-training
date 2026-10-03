@@ -20,10 +20,33 @@ export async function GET(request) {
       supabase
         .from('branches')
         .select('id, name, code, is_active, drive_bridge_url, drive_bridge_secret_enc')
+        .eq('is_active', true)
         .order('name'),
-      supabase.from('training_types').select('id, name, is_active').order('name'),
-      supabase.from('absence_reasons').select('id, name, is_active').order('name'),
+      supabase.from('training_types').select('id, name, is_active').eq('is_active', true).order('name'),
+      supabase.from('absence_reasons').select('id, name, is_active').eq('is_active', true).order('name'),
     ]);
+
+    let reasons = reasonsRes.data || [];
+
+    // Pastikan 'Lain - lain' selalu ada di daftar alasan
+    const hasLainLain = reasons.some((r) => r.name.toLowerCase().includes('lain'));
+    if (!hasLainLain) {
+      try {
+        const { data: inserted } = await supabase
+          .from('absence_reasons')
+          .insert({ name: 'Lain - lain', is_active: true, sort_order: 11 })
+          .select()
+          .single();
+        if (inserted) {
+          reasons.push(inserted);
+        } else {
+          reasons.push({ id: 'ar-011', name: 'Lain - lain', is_active: true });
+        }
+      } catch {
+        reasons.push({ id: 'ar-011', name: 'Lain - lain', is_active: true });
+      }
+      reasons.sort((a, b) => a.name.localeCompare(b.name, 'id'));
+    }
 
     // Format data cabang: sediakan flag `driveReady` tanpa mengekspos secret
     const branches = (branchesRes.data || []).map((b) => ({
@@ -35,7 +58,6 @@ export async function GET(request) {
     }));
 
     const trainings = trainingsRes.data || [];
-    const reasons = reasonsRes.data || [];
 
     const currentYear = new Date().getFullYear();
     const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
