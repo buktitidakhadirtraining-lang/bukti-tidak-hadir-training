@@ -1,0 +1,35 @@
+{
+  "name": "sistem-ketidakhadiran-training",
+  "version": "1.0.0",
+  "description": "Sistem Data Ketidakhadiran Peserta Training multi-cabang dengan integrasi Supabase dan Google Drive, dikembangkan oleh Bang Ajiib (2026).",
+  "author": "Bang Ajiib",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000 -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -p 3000 -H 0.0.0.0",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
+    "html2pdf.js": "^0.14.0",
+    "jose": "^5.9.6",
+    "lucide-react": "^0.469.0",
+    "next": "14.2.24",
+    "papaparse": "^5.5.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "sonner": "^1.7.4",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.24",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17"
+  }
+}
