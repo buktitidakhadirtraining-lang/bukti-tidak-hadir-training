@@ -17,26 +17,18 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { LOGO_URL, formatDateIndo } from '../../../lib/config.js';
 
-// Komponen gambar bukti dengan pendeteksi otomatis status complete/cached
+// Komponen gambar bukti yang aman dan tidak memicu re-render loop
 function ProofImage({ recordId, src, alt, onLoaded }) {
-  const imgRef = React.useRef(null);
-
-  React.useEffect(() => {
-    if (imgRef.current && (imgRef.current.complete || imgRef.current.naturalWidth > 0)) {
-      onLoaded(recordId);
-    }
-  }, [recordId, src, onLoaded]);
-
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      ref={imgRef}
       src={src}
       alt={alt}
       crossOrigin="anonymous"
+      loading="lazy"
       className="max-h-[140px] max-w-full object-contain mx-auto"
-      onLoad={() => onLoaded(recordId)}
-      onError={() => onLoaded(recordId)}
+      onLoad={() => onLoaded && onLoaded(recordId)}
+      onError={() => onLoaded && onLoaded(recordId)}
     />
   );
 }
@@ -49,7 +41,7 @@ export default function CetakPage() {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Format Cetak: 'lama' (Grid Vertikal) atau 'horizontal' (Grid Horizontal 4 Kolom)
-  const [printFormat, setPrintFormat] = useState('lama');
+  const [printFormat, setPrintFormat] = useState('horizontal');
 
   // Filters
   const [branchId, setBranchId] = useState('');
@@ -129,27 +121,14 @@ export default function CetakPage() {
     totalImagesToLoad === 0 ||
     loadedImagesCount >= totalImagesToLoad;
 
-  // Timeout pengaman agar status loading gambar tidak pernah menggantung jika di-cache browser
-  useEffect(() => {
-    if (totalImagesToLoad > 0 && !isAllImagesLoaded) {
-      const timer = setTimeout(() => {
-        setLoadedImageIds((prev) => {
-          const next = new Set(prev);
-          imageProofRecords.forEach((r) => next.add(r.id));
-          return next;
-        });
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [totalImagesToLoad, isAllImagesLoaded, imageProofRecords]);
-
-  function handleImageLoaded(recordId) {
+  const handleImageLoaded = useCallback((recordId) => {
     setLoadedImageIds((prev) => {
+      if (prev.has(recordId)) return prev;
       const next = new Set(prev);
       next.add(recordId);
       return next;
     });
-  }
+  }, []);
 
   function handlePrint() {
     window.print();
