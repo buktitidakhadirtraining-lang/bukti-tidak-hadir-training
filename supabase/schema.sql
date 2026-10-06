@@ -208,9 +208,7 @@ insert into users (
   true,
   false
 )
-on conflict (username) do update set
-  password_hash = crypt('Admin123!', gen_salt('bf', 10)),
-  is_active = true;
+on conflict (username) do nothing;
 
 -- Akun alternatif 'admin'
 insert into users (
@@ -230,9 +228,7 @@ insert into users (
   true,
   false
 )
-on conflict (username) do update set
-  password_hash = crypt('Admin123!', gen_salt('bf', 10)),
-  is_active = true;
+on conflict (username) do nothing;
 
 -- Akun Admin Cabang Surabaya
 insert into users (
@@ -257,6 +253,70 @@ where b.code = 'SBY1'
 on conflict (username) do nothing;
 
 -- ==============================================================================
--- 14. RELOAD SCHEMA CACHE POSTGREST
+-- 15. TABEL TAMBAHAN: SINKRONISASI SPREADSHEET & CETAK BERITA ACARA REKAP
+-- ==============================================================================
+create table if not exists cetak_rekap (
+  id uuid primary key default gen_random_uuid(),
+  no int,
+  jenis_training text not null,
+  target_lskt text default '0',
+  dispensasi text default '0',
+  target_tc_report text default '',
+  hadir text default '',
+  tidak_hadir text default '',
+  no_list_peserta_tidak_hadir text default '',
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+create unique index if not exists idx_cetak_rekap_training on cetak_rekap (jenis_training);
+
+create table if not exists list_tidak_hadir (
+  id uuid primary key default gen_random_uuid(),
+  no int,
+  training text not null,
+  nik text not null,
+  nama text not null,
+  kd_toko text,
+  nama_toko text,
+  alasan_tidak_hadir text,
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+create index if not exists idx_list_tidak_hadir_training on list_tidak_hadir (training);
+create index if not exists idx_list_tidak_hadir_nik on list_tidak_hadir (nik);
+
+create table if not exists data_tambahan (
+  id uuid primary key default gen_random_uuid(),
+  no serial,
+  training text not null,
+  nik text not null,
+  nama text not null,
+  kd_toko text,
+  nama_toko text,
+  alasan_tidak_hadir text,
+  source_record_id uuid,
+  created_at timestamptz default now() not null
+);
+
+create table if not exists cetak_list_tidak_hadir (
+  id uuid primary key default gen_random_uuid(),
+  no int,
+  training text not null,
+  nik text not null,
+  nama text not null,
+  kd_toko text,
+  nama_toko text,
+  alasan_tidak_hadir text,
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
+alter table cetak_rekap enable row level security;
+alter table list_tidak_hadir enable row level security;
+alter table data_tambahan enable row level security;
+alter table cetak_list_tidak_hadir enable row level security;
+
+-- ==============================================================================
+-- 16. RELOAD SCHEMA CACHE POSTGREST
 -- ==============================================================================
 notify pgrst, 'reload schema';

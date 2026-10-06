@@ -12,10 +12,20 @@ import {
   AlertTriangle,
   LayoutGrid,
   ListOrdered,
+  FileCheck2,
+  Users2,
+  RefreshCw,
+  Code2,
+  CheckCircle2,
+  Calendar,
+  PenTool,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { LOGO_URL, formatDateIndo } from '../../../lib/config.js';
+import BeritaAcaraRekap from '../../../components/BeritaAcaraRekap.js';
+import LampiranListTidakHadir from '../../../components/LampiranListTidakHadir.js';
+import SqlEditorModal from '../../../components/SqlEditorModal.js';
 
 // Komponen gambar bukti yang tajam dan aman
 function ProofImage({ recordId, src, alt, onLoaded }) {
@@ -43,10 +53,31 @@ export default function CetakPage() {
   const [loading, setLoading] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
-  // Format Cetak: 'lama' (Grid Vertikal) atau 'horizontal' (Grid Horizontal 4 Kolom)
-  const [printFormat, setPrintFormat] = useState('horizontal');
+  // Format Cetak:
+  // - 'rekap_dispensasi': Berita Acara Rekapitulasi (Gambar 2 & Gambar 3) dari sheet 'cetak_rekap'
+  // - 'list_tidak_hadir': Lampiran Detail Peserta Tidak Hadir (Gambar 4) dari sheet 'list_tidak_hadir'
+  // - 'horizontal': Grid Horizontal 4 Kolom Foto Bukti
+  // - 'lama': Grid Vertikal Lama
+  const [printFormat, setPrintFormat] = useState('rekap_dispensasi');
 
-  // Filters
+  // Pengaturan Berita Acara Rekap (Gambar 2 & Gambar 3)
+  const [rekapData, setRekapData] = useState([]);
+  const [listTidakHadirData, setListTidakHadirData] = useState([]);
+  const [ttdMode, setTtdMode] = useState('ada'); // 'kosong' (Gambar 2) | 'ada' (Gambar 3)
+  const [tanggalCetak, setTanggalCetak] = useState('Surabaya, 5 Oktober 2026');
+  const [cabangCetak, setCabangCetak] = useState('Training Center Cabang Surabaya');
+  const [bulanCetak, setBulanCetak] = useState('Oktober');
+  const [tahunCetak, setTahunCetak] = useState('2026');
+
+  // Pengaturan Lampiran List Tidak Hadir (Gambar 4)
+  const [selectedTrainingListFilter, setSelectedTrainingListFilter] = useState('');
+
+  // Status Sinkronisasi Live Time 10 Detik
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+
+  // Filters Format Bukti Foto
   const [branchId, setBranchId] = useState('');
   const [trainingId, setTrainingId] = useState('');
   const [batch, setBatch] = useState('');
@@ -58,6 +89,7 @@ export default function CetakPage() {
   // Tracking loaded images for Format Horizontal
   const [loadedImageIds, setLoadedImageIds] = useState(new Set());
 
+  // 1. Muat Meta
   useEffect(() => {
     async function loadMeta() {
       try {
@@ -76,11 +108,11 @@ export default function CetakPage() {
     loadMeta();
   }, []);
 
+  // 2. Fetch Records Bukti Foto
   const fetchRecords = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      // Batasi maksimal 400 data per cetak
       params.set('limit', '400');
       if (branchId) params.set('branch_id', branchId);
       if (trainingId) params.set('training_id', trainingId);
@@ -105,7 +137,47 @@ export default function CetakPage() {
     fetchRecords();
   }, [fetchRecords]);
 
-  // Total foto bukti yang harus dimuat (bukan PDF dan ada drive_file_id)
+  // 3. Fetch & Live Sync Data Spreadsheet (10 Detik Sekali)
+  const syncSpreadsheet = useCallback(async (manual = false) => {
+    if (manual) setIsSyncing(true);
+    try {
+      const res = await fetch(`/api/sync-sheets${manual ? '?force=true' : ''}`);
+      const json = await res.json();
+      if (json.ok) {
+        if (Array.isArray(json.rekap) && json.rekap.length > 0) {
+          setRekapData(json.rekap);
+        }
+        if (Array.isArray(json.listTidakHadir) && json.listTidakHadir.length > 0) {
+          setListTidakHadirData(json.listTidakHadir);
+        }
+        setLastSyncTime(new Date());
+        if (manual) {
+          toast.success(
+            `Data tersinkronisasi: ${json.rekap?.length || 0} rekap, ${json.listTidakHadir?.length || 0} list peserta.`
+          );
+        }
+      }
+    } catch (err) {
+      console.error('[Live Sync Error]:', err);
+      if (manual) toast.error('Gagal sinkronisasi data dari spreadsheet');
+    } finally {
+      if (manual) setIsSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Inisialisasi awal
+    syncSpreadsheet(false);
+
+    // Live polling setiap 10 detik sesuai permintaan user
+    const interval = setInterval(() => {
+      syncSpreadsheet(false);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [syncSpreadsheet]);
+
+  // Tracking loaded images
   const imageProofRecords = useMemo(() => {
     return records.filter(
       (r) =>
@@ -120,7 +192,7 @@ export default function CetakPage() {
   }, [records, loadedImageIds]);
 
   const isAllImagesLoaded =
-    printFormat === 'lama' ||
+    printFormat !== 'horizontal' ||
     totalImagesToLoad === 0 ||
     loadedImagesCount >= totalImagesToLoad;
 
@@ -137,13 +209,9 @@ export default function CetakPage() {
     window.print();
   }
 
-  // Fungsi mengunduh berkas fisik berupa PDF langsung ke komputer/perangkat
+  // Fungsi mengunduh berkas fisik PDF langsung ke komputer
   async function handleDownloadPdf() {
     if (downloadingPdf) return;
-    if (records.length === 0) {
-      toast.error('Tidak ada data ketidakhadiran untuk diunduh');
-      return;
-    }
 
     setDownloadingPdf(true);
     const toastId = toast.loading('Sedang memproses dan membuat berkas PDF...');
@@ -157,15 +225,29 @@ export default function CetakPage() {
         throw new Error('Elemen konten dokumen cetak tidak ditemukan');
       }
 
-      const branchName = selectedBranchObj?.name ? `_${selectedBranchObj.name.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
-      const period = year ? `_${year}` : '';
-      const docType = printFormat === 'lama' ? 'Berita_Acara_Ketidakhadiran_Training' : 'Lampiran_Bukti_Tidak_Hadir_Training';
-      const filename = `${docType}${branchName}${period}.pdf`;
+      // Tentukan nama berkas dan orientasi sesuai format yang aktif
+      let filename = 'Dokumen_Ketidakhadiran_Training.pdf';
+      let orientation = 'portrait';
+
+      if (printFormat === 'rekap_dispensasi') {
+        filename = `Berita_Acara_Rekapitulasi_Training_${bulanCetak}_${tahunCetak}_${ttdMode}.pdf`;
+        orientation = 'portrait';
+      } else if (printFormat === 'list_tidak_hadir') {
+        const trTag = selectedTrainingListFilter ? `_${selectedTrainingListFilter.replace(/[^a-zA-Z0-9]/g, '_')}` : '_Semua_Training';
+        filename = `Lampiran_Detail_Peserta_Tidak_Hadir${trTag}.pdf`;
+        orientation = 'portrait';
+      } else if (printFormat === 'horizontal') {
+        filename = `Lampiran_Bukti_Foto_Horizontal_${year}.pdf`;
+        orientation = 'landscape';
+      } else {
+        filename = `Berita_Acara_Lama_${year}.pdf`;
+        orientation = 'landscape';
+      }
 
       const opt = {
         margin: [5, 5, 5, 5],
         filename: filename,
-        image: { type: 'png' }, // Lossless PNG untuk ketajaman tulisan 100% tanpa noise kompresi
+        image: { type: 'png' }, // Lossless PNG untuk ketajaman tulisan maksimal
         html2canvas: {
           scale: 4, // Super Ultra-HD 4K (4x High-Density Pixel Mapping)
           dpi: 300,
@@ -176,12 +258,12 @@ export default function CetakPage() {
           backgroundColor: '#ffffff',
           scrollY: 0,
           scrollX: 0,
-          windowWidth: 1600,
+          windowWidth: orientation === 'portrait' ? 1200 : 1600,
         },
         jsPDF: {
           unit: 'mm',
           format: 'a4',
-          orientation: 'landscape',
+          orientation: orientation,
           compress: true,
           precision: 16,
         },
@@ -201,7 +283,7 @@ export default function CetakPage() {
   const selectedBranchObj = meta?.branches?.find((b) => b.id === branchId);
   const selectedTrainingObj = meta?.trainings?.find((t) => t.id === trainingId);
 
-  // Helper url ekspor Excel sesuai filter aktif
+  // Helper url ekspor Excel
   function getExcelExportUrl() {
     const params = new URLSearchParams();
     params.set('format', 'xlsx');
@@ -213,7 +295,7 @@ export default function CetakPage() {
     return `/api/records/export?${params.toString()}`;
   }
 
-  // Pengelompokan data per jenis training untuk Format Horizontal (Baru)
+  // Pengelompokan data per jenis training untuk Format Horizontal
   const trainingGroups = useMemo(() => {
     const groups = records.reduce((acc, r) => {
       const tId = r.training_id || 'unassigned';
@@ -227,6 +309,15 @@ export default function CetakPage() {
     return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
   }, [records]);
 
+  // Daftar jenis training unik dari sheet list_tidak_hadir
+  const uniqueTrainingsFromList = useMemo(() => {
+    const set = new Set();
+    for (const item of listTidakHadirData) {
+      if (item.training) set.add(item.training.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [listTidakHadirData]);
+
   // Helper chunk array menjadi kelompok 4 item
   function chunkArray(array, size = 4) {
     const result = [];
@@ -238,8 +329,9 @@ export default function CetakPage() {
 
   return (
     <div className="space-y-6">
-      {/* Control Panel (Hidden saat cetak) */}
+      {/* Control Panel (Hidden saat cetak browser) */}
       <div className="no-print bg-white p-5 rounded-2xl border border-gray-100 shadow-soft space-y-4">
+        {/* Baris 1: Header & Tombol Utama */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -249,53 +341,71 @@ export default function CetakPage() {
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-xl font-black text-gray-900 font-title">
-                Cetak Bukti Ketidakhadiran
-              </h1>
-              <p className="text-xs text-gray-500">
-                Pilih format cetak dan filter data ketidakhadiran (A4 Landscape).
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-xl font-black text-gray-900 font-title">
+                  Cetak Dokumen & Rekap PDF
+                </h1>
+                {/* Live Sync Badge 10s */}
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Live Sync (10s): Terhubung</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Pilih format cetak: Berita Acara Rekap (Gambar 2 & 3), Lampiran List Peserta (Gambar 4), atau Bukti Foto.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Progress status pemuatan gambar jika format horizontal */}
-            {printFormat === 'horizontal' && totalImagesToLoad > 0 && !isAllImagesLoaded && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
-                <span>
-                  Memuat gambar {loadedImagesCount}/{totalImagesToLoad}
-                </span>
-              </div>
-            )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Tombol Buka SQL Editor Skrip */}
+            <button
+              type="button"
+              onClick={() => setShowSqlModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-all"
+              title="Lihat skrip SQL untuk membuat tabel cetak_rekap, list_tidak_hadir, data_tambahan"
+            >
+              <Code2 className="w-4 h-4 text-[#0056b3]" />
+              <span>Kode SQL Editor</span>
+            </button>
+
+            {/* Tombol Sinkronkan Manual */}
+            <button
+              type="button"
+              onClick={() => syncSpreadsheet(true)}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#0056b3] text-xs font-bold transition-all disabled:opacity-50"
+              title="Tarik pembaruan terkini dari spreadsheet sekarang"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sinkron...' : 'Sync Live'}</span>
+            </button>
 
             {/* Tombol Unduh Excel */}
-            <a
-              href={getExcelExportUrl()}
-              download
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all min-h-[42px]"
-              title="Unduh data sesuai filter aktif ke berkas Excel (.xlsx)"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Unduh Excel</span>
-            </a>
+            {printFormat === 'horizontal' && (
+              <a
+                href={getExcelExportUrl()}
+                download
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-all"
+                title="Unduh data sesuai filter aktif ke Excel (.xlsx)"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Unduh Excel</span>
+              </a>
+            )}
 
-            {/* Tombol Unduh PDF (Mengunduh file fisik .pdf) */}
+            {/* Tombol Unduh PDF */}
             <button
               type="button"
               onClick={handleDownloadPdf}
-              disabled={loading || records.length === 0 || downloadingPdf}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all min-h-[42px] ${
-                loading || records.length === 0 || downloadingPdf
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
-                  : 'bg-[#0056b3] hover:bg-blue-700 text-white'
-              }`}
-              title="Unduh langsung dokumen ini sebagai file berkas PDF (.pdf)"
+              disabled={downloadingPdf}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0056b3] hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
+              title="Unduh langsung dokumen ini sebagai berkas PDF (.pdf) Ultra-HD"
             >
               {downloadingPdf ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Mengunduh PDF...</span>
+                  <span>Mengunduh...</span>
                 </>
               ) : (
                 <>
@@ -305,16 +415,12 @@ export default function CetakPage() {
               )}
             </button>
 
-            {/* Tombol Cetak (Membuka dialog cetak browser) */}
+            {/* Tombol Cetak Browser */}
             <button
               type="button"
               onClick={handlePrint}
-              disabled={loading || records.length === 0 || downloadingPdf}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all min-h-[42px] ${
-                loading || records.length === 0 || downloadingPdf
-                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed shadow-none'
-                  : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-xs'
-              }`}
+              disabled={downloadingPdf}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 text-xs font-bold shadow-xs transition-all"
               title="Buka dialog cetak browser (Cetak ke printer fisik)"
             >
               <Printer className="w-4 h-4" />
@@ -323,15 +429,58 @@ export default function CetakPage() {
           </div>
         </div>
 
-        {/* Pemilihan Format Cetak (Radio / Tab Selector) */}
-        <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Baris 2: Pemilihan 4 Format Cetak */}
+        <div className="pt-3 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-gray-700 mr-2">Format Cetak:</span>
-            <div className="inline-flex p-1 bg-gray-100 rounded-xl border border-gray-200">
+            <span className="text-xs font-bold text-gray-700 mr-1">Pilihan Format Cetak:</span>
+            <div className="inline-flex p-1 bg-gray-100 rounded-xl border border-gray-200 flex-wrap gap-1">
+              {/* 1. Berita Acara Rekap (Gambar 2 & 3) */}
+              <button
+                type="button"
+                onClick={() => setPrintFormat('rekap_dispensasi')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  printFormat === 'rekap_dispensasi'
+                    ? 'bg-white text-[#0056b3] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <FileCheck2 className="w-3.5 h-3.5 text-blue-600" />
+                <span>Berita Acara Rekap (Gambar 2 & 3)</span>
+              </button>
+
+              {/* 2. Lampiran List Tidak Hadir (Gambar 4) */}
+              <button
+                type="button"
+                onClick={() => setPrintFormat('list_tidak_hadir')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  printFormat === 'list_tidak_hadir'
+                    ? 'bg-white text-[#0056b3] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Users2 className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Lampiran List Peserta (Gambar 4)</span>
+              </button>
+
+              {/* 3. Grid Horizontal Foto Bukti */}
+              <button
+                type="button"
+                onClick={() => setPrintFormat('horizontal')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  printFormat === 'horizontal'
+                    ? 'bg-white text-[#0056b3] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Bukti Foto Horizontal (4 Kolom)</span>
+              </button>
+
+              {/* 4. Grid Vertikal Lama */}
               <button
                 type="button"
                 onClick={() => setPrintFormat('lama')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   printFormat === 'lama'
                     ? 'bg-white text-[#0056b3] shadow-xs'
                     : 'text-gray-600 hover:text-gray-900'
@@ -340,133 +489,390 @@ export default function CetakPage() {
                 <ListOrdered className="w-3.5 h-3.5" />
                 <span>Grid Vertikal (Lama)</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setPrintFormat('horizontal')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  printFormat === 'horizontal'
-                    ? 'bg-white text-[#0056b3] shadow-xs'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Grid Horizontal 4 Kolom (Baru)</span>
-              </button>
             </div>
           </div>
 
           <div className="text-xs text-gray-500">
-            Menampilkan: <strong className="text-gray-800">{records.length}</strong> dari{' '}
-            <strong className="text-gray-800">{totalCount}</strong> data
+            {printFormat === 'rekap_dispensasi' && (
+              <span>Sumber Data: <strong className="text-gray-800">Sheet cetak_rekap</strong> ({rekapData.length} baris)</span>
+            )}
+            {printFormat === 'list_tidak_hadir' && (
+              <span>Sumber Data: <strong className="text-gray-800">Sheet list_tidak_hadir</strong> ({listTidakHadirData.length} peserta)</span>
+            )}
+            {(printFormat === 'horizontal' || printFormat === 'lama') && (
+              <span>Menampilkan: <strong className="text-gray-800">{records.length}</strong> data</span>
+            )}
           </div>
         </div>
 
-        {/* Peringatan jika data melebihi batas 400 */}
-        {totalCount > 400 && (
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+        {/* Baris 3: Pengaturan Dinamis Berdasarkan Format Aktif */}
+
+        {/* A. Pengaturan Khusus Berita Acara Rekapitulasi (Gambar 2 & 3) */}
+        {printFormat === 'rekap_dispensasi' && (
+          <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs bg-blue-50/40 p-3.5 rounded-xl border border-blue-100">
+            {/* Pilihan Mode Tanda Tangan */}
             <div>
-              <span className="font-bold">Batas Maksimal 400 Data Tercapai:</span> Ditemukan {totalCount} data sesuai filter saat ini. Hanya 400 data pertama yang ditampilkan untuk dicetak. Harap persempit filter (pilih jenis training, cabang, bulan, atau tahun tertentu) agar cetakan optimal.
+              <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+                <PenTool className="w-3.5 h-3.5 text-[#0056b3]" />
+                Versi Tanda Tangan
+              </label>
+              <div className="inline-flex w-full p-1 bg-white rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setTtdMode('kosong')}
+                  className={`flex-1 py-1 text-center font-bold rounded text-xs transition-colors ${
+                    ttdMode === 'kosong'
+                      ? 'bg-blue-100 text-[#0056b3]'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  TTD Kosong (Gbr 2)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTtdMode('ada')}
+                  className={`flex-1 py-1 text-center font-bold rounded text-xs transition-colors ${
+                    ttdMode === 'ada'
+                      ? 'bg-blue-100 text-[#0056b3]'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Sudah Ada TTD (Gbr 3)
+                </button>
+              </div>
+            </div>
+
+            {/* Setting Tanggal Cetak (Bebas Diedit Sesuai Keinginan User) */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-[#0056b3]" />
+                Tanggal Cetak (Bebas Diatur)
+              </label>
+              <input
+                type="text"
+                value={tanggalCetak}
+                onChange={(e) => setTanggalCetak(e.target.value)}
+                placeholder="Contoh: Surabaya, 5 Oktober 2026"
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              />
+            </div>
+
+            {/* Cabang */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Nama Training Center</label>
+              <input
+                type="text"
+                value={cabangCetak}
+                onChange={(e) => setCabangCetak(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              />
+            </div>
+
+            {/* Bulan Periode */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Bulan Periode</label>
+              <input
+                type="text"
+                value={bulanCetak}
+                onChange={(e) => setBulanCetak(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              />
+            </div>
+
+            {/* Tahun Periode */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Tahun Periode</label>
+              <input
+                type="text"
+                value={tahunCetak}
+                onChange={(e) => setTahunCetak(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              />
             </div>
           </div>
         )}
 
-        {/* Filters */}
-        <div className="pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-          {meta?.userRole === 'admin_pusat' && (
-            <div>
-              <label className="block font-bold text-gray-600 mb-1">Cabang</label>
+        {/* B. Pengaturan Khusus Lampiran List Tidak Hadir (Gambar 4) */}
+        {printFormat === 'list_tidak_hadir' && (
+          <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3 text-xs bg-indigo-50/40 p-3.5 rounded-xl border border-indigo-100">
+            <div className="w-full sm:w-72">
+              <label className="block font-bold text-gray-700 mb-1">Pilih Jenis Training:</label>
               <select
-                value={branchId}
-                onChange={(e) => setBranchId(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+                value={selectedTrainingListFilter}
+                onChange={(e) => setSelectedTrainingListFilter(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
               >
-                <option value="">Semua Cabang</option>
-                {meta?.branches?.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
+                <option value="">Semua Jenis Training (Dipisah Rapi)</option>
+                {uniqueTrainingsFromList.map((tr) => (
+                  <option key={tr} value={tr}>
+                    {tr}
                   </option>
                 ))}
               </select>
             </div>
-          )}
-
-          <div>
-            <label className="block font-bold text-gray-600 mb-1">Jenis Training</label>
-            <select
-              value={trainingId}
-              onChange={(e) => setTrainingId(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-            >
-              <option value="">Semua Training</option>
-              {meta?.trainings?.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            <div className="text-gray-500 text-xs sm:mt-5">
+              💡 <em>Tiap jenis training akan otomatis dipisahkan per halaman (print-page-break) dengan format resmi persis Gambar 4.</em>
+            </div>
           </div>
+        )}
 
-          <div>
-            <label className="block font-bold text-gray-600 mb-1">Bulan</label>
-            <select
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-            >
-              <option value="">Semua Bulan</option>
-              {meta?.months?.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* C. Pengaturan Format Bukti Foto (Horizontal / Lama) */}
+        {(printFormat === 'horizontal' || printFormat === 'lama') && (
+          <div className="pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+            {meta?.userRole === 'admin_pusat' && (
+              <div>
+                <label className="block font-bold text-gray-600 mb-1">Cabang</label>
+                <select
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+                >
+                  <option value="">Semua Cabang</option>
+                  {meta?.branches?.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-          <div>
-            <label className="block font-bold text-gray-600 mb-1">Tahun</label>
-            <select
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-            >
-              <option value="">Semua Tahun</option>
-              {meta?.years?.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
+            <div>
+              <label className="block font-bold text-gray-600 mb-1">Jenis Training</label>
+              <select
+                value={trainingId}
+                onChange={(e) => setTrainingId(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+              >
+                <option value="">Semua Training</option>
+                {meta?.trainings?.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block font-bold text-gray-600 mb-1">Nama Trainer</label>
-            <input
-              type="text"
-              value={trainerName}
-              onChange={(e) => setTrainerName(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-            />
-          </div>
+            <div>
+              <label className="block font-bold text-gray-600 mb-1">Bulan</label>
+              <select
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+              >
+                <option value="">Semua Bulan</option>
+                {meta?.months?.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block font-bold text-gray-600 mb-1">Pimpinan / Manager</label>
-            <input
-              type="text"
-              value={managerName}
-              onChange={(e) => setManagerName(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-            />
+            <div>
+              <label className="block font-bold text-gray-600 mb-1">Tahun</label>
+              <select
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+              >
+                <option value="">Semua Tahun</option>
+                {meta?.years?.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-bold text-gray-600 mb-1">Nama Trainer</label>
+              <input
+                type="text"
+                value={trainerName}
+                onChange={(e) => setTrainerName(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-gray-600 mb-1">Pimpinan / Manager</label>
+              <input
+                type="text"
+                value={managerName}
+                onChange={(e) => setManagerName(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
-      {/* FORMAT 1: GRID VERTIKAL (LAMA) - Tetap ada sebagai pilihan default        */}
+      {/* 1. FORMAT: BERITA ACARA REKAPITULASI (GAMBAR 2 & GAMBAR 3)                 */}
+      {/* ========================================================================= */}
+      {printFormat === 'rekap_dispensasi' && (
+        <div id="printable-content" className="max-w-4xl mx-auto">
+          <BeritaAcaraRekap
+            data={rekapData}
+            ttdMode={ttdMode}
+            tanggalCetak={tanggalCetak}
+            cabang={cabangCetak}
+            bulan={bulanCetak}
+            tahun={tahunCetak}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. FORMAT: LAMPIRAN DETAIL PESERTA TIDAK HADIR (GAMBAR 4)                 */}
+      {/* ========================================================================= */}
+      {printFormat === 'list_tidak_hadir' && (
+        <div id="printable-content" className="max-w-4xl mx-auto">
+          <LampiranListTidakHadir
+            data={listTidakHadirData}
+            selectedTraining={selectedTrainingListFilter}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. FORMAT: GRID HORIZONTAL 4 KOLOM BUKTI FOTO                             */}
+      {/* ========================================================================= */}
+      {printFormat === 'horizontal' && (
+        <div id="printable-content" className="space-y-8 print:space-y-0">
+          {trainingGroups.length > 0 ? (
+            trainingGroups.map((group, groupIdx) => {
+              const chunks = chunkArray(group.records, 4);
+
+              return (
+                <div
+                  key={group.id}
+                  className={`bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-md max-w-6xl mx-auto print:p-0 print:border-0 print:shadow-none ${
+                    groupIdx > 0 ? 'print-page-break' : ''
+                  }`}
+                >
+                  <div className="overflow-x-auto">
+                    <table
+                      className="w-full text-left text-xs"
+                      style={{
+                        borderCollapse: 'collapse',
+                        border: '1px solid #000000',
+                      }}
+                    >
+                      <thead>
+                        <tr>
+                          <th
+                            colSpan={8}
+                            className="text-center font-black uppercase text-sm sm:text-base p-2 font-title tracking-wider text-black"
+                            style={{ border: '1px solid #000000', backgroundColor: '#F3F4F6' }}
+                          >
+                            LAMPIRAN BUKTI TIDAK HADIR
+                          </th>
+                        </tr>
+                        <tr>
+                          <th
+                            colSpan={8}
+                            className="text-center font-bold uppercase text-xs sm:text-sm p-1.5 font-title tracking-wide text-black"
+                            style={{ border: '1px solid #000000', backgroundColor: '#F9FAFB' }}
+                          >
+                            {group.name}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chunks.map((chunk, chunkIdx) => {
+                          const padded = [...chunk];
+                          while (padded.length < 4) {
+                            padded.push(null);
+                          }
+
+                          return (
+                            <React.Fragment key={chunkIdx}>
+                              <tr className="print-break-avoid" style={{ backgroundColor: '#ffffff' }}>
+                                {padded.map((item, idx) => (
+                                  <React.Fragment key={`id-${chunkIdx}-${idx}`}>
+                                    <td
+                                      className="p-1 text-center font-mono font-bold text-[10px] sm:text-[11px] text-black"
+                                      style={{ border: '1px solid #000000', width: '11%' }}
+                                    >
+                                      {item ? item.nik : ''}
+                                    </td>
+                                    <td
+                                      className="p-1 font-semibold text-[10px] sm:text-[11px] text-gray-900 truncate"
+                                      style={{ border: '1px solid #000000', width: '14%' }}
+                                      title={item ? item.nama_peserta : ''}
+                                    >
+                                      {item ? item.nama_peserta : ''}
+                                    </td>
+                                  </React.Fragment>
+                                ))}
+                              </tr>
+
+                              <tr className="print-break-avoid" style={{ backgroundColor: '#ffffff' }}>
+                                {padded.map((item, idx) => (
+                                  <td
+                                    key={`img-${chunkIdx}-${idx}`}
+                                    colSpan={2}
+                                    className="p-1 text-center align-middle"
+                                    style={{
+                                      border: '1px solid #000000',
+                                      width: '25%',
+                                      height: '175px',
+                                      minHeight: '175px',
+                                      maxHeight: '185px',
+                                    }}
+                                  >
+                                    {!item ? (
+                                      <div className="h-[168px] w-full" />
+                                    ) : !item.drive_file_id ? (
+                                      <div className="h-[168px] w-full flex flex-col items-center justify-center text-gray-400 italic text-[11px]">
+                                        Tidak ada bukti
+                                      </div>
+                                    ) : item.file_mime_type === 'application/pdf' ? (
+                                      <div className="h-[168px] w-full flex flex-col items-center justify-center p-2 text-gray-700 bg-gray-50/60 rounded">
+                                        <FileText className="w-8 h-8 text-red-500 mb-1" />
+                                        <span className="text-[10px] font-bold text-center leading-tight">
+                                          Dokumen PDF
+                                          <br />
+                                          <span className="font-normal text-gray-500">(lihat di sistem)</span>
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <div className="h-[168px] w-full flex items-center justify-center overflow-hidden">
+                                        <ProofImage
+                                          recordId={item.id}
+                                          src={`/api/records/${item.id}/file`}
+                                          alt={`Bukti ${item.nama_peserta}`}
+                                          onLoaded={handleImageLoaded}
+                                        />
+                                      </div>
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center text-gray-500 italic max-w-6xl mx-auto">
+              Tidak ada catatan ketidakhadiran untuk kriteria filter yang dipilih.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. FORMAT: GRID VERTIKAL LAMA                                             */}
       {/* ========================================================================= */}
       {printFormat === 'lama' && (
         <div id="printable-content" className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-200 shadow-md max-w-5xl mx-auto print:p-0 print:border-0 print:shadow-none">
-          {/* Kop Surat Berita Acara */}
           <div className="flex items-start justify-between border-b-2 border-gray-800 pb-4">
             <div className="flex items-center gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -492,7 +898,6 @@ export default function CetakPage() {
             </div>
           </div>
 
-          {/* Judul Dokumen */}
           <div className="text-center my-6">
             <h1 className="text-base sm:text-lg font-black uppercase text-gray-900 tracking-wider underline font-title">
               BERITA ACARA KETIDAKHADIRAN PESERTA TRAINING
@@ -502,7 +907,6 @@ export default function CetakPage() {
             </p>
           </div>
 
-          {/* Tabel Data Ketidakhadiran */}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse border border-gray-800 text-[11px]">
               <thead>
@@ -556,7 +960,6 @@ export default function CetakPage() {
             </table>
           </div>
 
-          {/* Kolom Tanda Tangan Resmi */}
           <div className="mt-12 pt-4 grid grid-cols-2 gap-8 text-center text-xs print-break-avoid">
             <div className="space-y-16">
               <p className="font-bold text-gray-800 uppercase">Dibuat & Diverifikasi Oleh,</p>
@@ -577,155 +980,11 @@ export default function CetakPage() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* FORMAT 2: GRID HORIZONTAL 4 KOLOM (BARU) - Lampiran Bukti 8 Kolom       */}
-      {/* ========================================================================= */}
-      {printFormat === 'horizontal' && (
-        <div id="printable-content" className="space-y-8 print:space-y-0">
-          {trainingGroups.length > 0 ? (
-            trainingGroups.map((group, groupIdx) => {
-              const chunks = chunkArray(group.records, 4);
-
-              return (
-                <div
-                  key={group.id}
-                  className={`bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-md max-w-6xl mx-auto print:p-0 print:border-0 print:shadow-none ${
-                    groupIdx > 0 ? 'print-page-break' : ''
-                  }`}
-                >
-                  <div className="overflow-x-auto">
-                    {/* Tabel format Excel: border-collapse, garis 1px hitam solid pada semua sel */}
-                    <table
-                      className="w-full text-left text-xs"
-                      style={{
-                        borderCollapse: 'collapse',
-                        border: '1px solid #000000',
-                      }}
-                    >
-                      <thead>
-                        {/* Baris 1 (judul): "LAMPIRAN BUKTI TIDAK HADIR", tebal, rata tengah, colspan 8 */}
-                        <tr>
-                          <th
-                            colSpan={8}
-                            className="text-center font-black uppercase text-sm sm:text-base p-2 font-title tracking-wider text-black"
-                            style={{ border: '1px solid #000000', backgroundColor: '#F3F4F6' }}
-                          >
-                            LAMPIRAN BUKTI TIDAK HADIR
-                          </th>
-                        </tr>
-                        {/* Baris 2 (sub-judul): nama jenis training, tebal, rata tengah, colspan 8 */}
-                        <tr>
-                          <th
-                            colSpan={8}
-                            className="text-center font-bold uppercase text-xs sm:text-sm p-1.5 font-title tracking-wide text-black"
-                            style={{ border: '1px solid #000000', backgroundColor: '#F9FAFB' }}
-                          >
-                            {group.name}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {chunks.map((chunk, chunkIdx) => {
-                          // Pastikan selalu ada 4 slot; jika sisa kurang dari 4, sisa kolom tetap ada & kosong
-                          const padded = [...chunk];
-                          while (padded.length < 4) {
-                            padded.push(null);
-                          }
-
-                          return (
-                            <React.Fragment key={chunkIdx}>
-                              {/* Baris data (identitas): 4 pasang sel per baris (1 sel NIK tebal, 1 sel Nama Lengkap) = total 8 kolom */}
-                              <tr className="print-break-avoid" style={{ backgroundColor: '#ffffff' }}>
-                                {padded.map((item, idx) => (
-                                  <React.Fragment key={`id-${chunkIdx}-${idx}`}>
-                                    {/* Sel NIK (tebal, rata tengah) */}
-                                    <td
-                                      className="p-1 text-center font-mono font-bold text-[10px] sm:text-[11px] text-black"
-                                      style={{
-                                        border: '1px solid #000000',
-                                        width: '11%',
-                                      }}
-                                    >
-                                      {item ? item.nik : ''}
-                                    </td>
-                                    {/* Sel Nama Lengkap */}
-                                    <td
-                                      className="p-1 font-semibold text-[10px] sm:text-[11px] text-gray-900 truncate"
-                                      style={{
-                                        border: '1px solid #000000',
-                                        width: '14%',
-                                      }}
-                                      title={item ? item.nama_peserta : ''}
-                                    >
-                                      {item ? item.nama_peserta : ''}
-                                    </td>
-                                  </React.Fragment>
-                                ))}
-                              </tr>
-
-                              {/* Baris gambar (tepat di bawah baris identitas): 4 sel, masing-masing colspan 2 */}
-                              <tr className="print-break-avoid" style={{ backgroundColor: '#ffffff' }}>
-                                {padded.map((item, idx) => (
-                                  <td
-                                    key={`img-${chunkIdx}-${idx}`}
-                                    colSpan={2}
-                                    className="p-1 text-center align-middle"
-                                    style={{
-                                      border: '1px solid #000000',
-                                      width: '25%',
-                                      height: '175px',
-                                      minHeight: '175px',
-                                      maxHeight: '185px',
-                                    }}
-                                  >
-                                    {!item ? (
-                                      // Slot kosong (jika sisa data < 4), garis sel tetap ada
-                                      <div className="h-[168px] w-full" />
-                                    ) : !item.drive_file_id ? (
-                                      // Jika data tidak punya bukti sama sekali
-                                      <div className="h-[168px] w-full flex flex-col items-center justify-center text-gray-400 italic text-[11px]">
-                                        Tidak ada bukti
-                                      </div>
-                                    ) : item.file_mime_type === 'application/pdf' ? (
-                                      // Jika mime type adalah application/pdf
-                                      <div className="h-[168px] w-full flex flex-col items-center justify-center p-2 text-gray-700 bg-gray-50/60 rounded">
-                                        <FileText className="w-8 h-8 text-red-500 mb-1" />
-                                        <span className="text-[10px] font-bold text-center leading-tight">
-                                          Dokumen PDF
-                                          <br />
-                                          <span className="font-normal text-gray-500">(lihat di sistem)</span>
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      // Jika mime type adalah gambar
-                                      <div className="h-[168px] w-full flex items-center justify-center overflow-hidden">
-                                        <ProofImage
-                                          recordId={item.id}
-                                          src={`/api/records/${item.id}/file`}
-                                          alt={`Bukti ${item.nama_peserta}`}
-                                          onLoaded={handleImageLoaded}
-                                        />
-                                      </div>
-                                    )}
-                                  </td>
-                                ))}
-                              </tr>
-                            </React.Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center text-gray-500 italic max-w-6xl mx-auto">
-              Tidak ada catatan ketidakhadiran untuk kriteria filter yang dipilih.
-            </div>
-          )}
-        </div>
-      )}
+      {/* Modal Skrip SQL Editor */}
+      <SqlEditorModal
+        isOpen={showSqlModal}
+        onClose={() => setShowSqlModal(false)}
+      />
     </div>
   );
 }

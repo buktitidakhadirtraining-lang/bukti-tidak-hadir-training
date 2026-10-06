@@ -39,5 +39,17 @@ h1, h2, h3, h4, h5, h6 {
 @media print {
   body {
     background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  .print-break-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
