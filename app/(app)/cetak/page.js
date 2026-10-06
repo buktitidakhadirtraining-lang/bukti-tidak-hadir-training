@@ -263,7 +263,7 @@ export default function CetakPage() {
       }
 
       const opt = {
-        margin: [4, 4, 4, 4],
+        margin: printFormat === 'list_tidak_hadir' ? [0, 0, 0, 0] : [4, 4, 4, 4],
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
@@ -275,7 +275,7 @@ export default function CetakPage() {
           backgroundColor: '#ffffff',
           scrollY: 0,
           scrollX: 0,
-          windowWidth: orientation === 'portrait' ? 820 : 1150,
+          windowWidth: orientation === 'portrait' ? 794 : 1150,
         },
         jsPDF: {
           unit: 'mm',
@@ -285,7 +285,7 @@ export default function CetakPage() {
         },
         pagebreak: {
           mode: ['css', 'legacy'],
-          before: ['.html2pdf__page-break', '.print-page-break'],
+          after: ['.sheet', '.html2pdf__page-break', '.print-page-break'],
           avoid: ['tr', 'thead', '.print-break-avoid'],
         },
       };
