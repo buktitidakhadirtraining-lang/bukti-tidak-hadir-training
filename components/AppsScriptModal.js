@@ -273,15 +273,32 @@ export default function AppsScriptModal({ isOpen, onClose }) {
   const [savingUrl, setSavingUrl] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
-  // Ambil URL yang saat ini tersimpan
+  // Ambil URL yang saat ini tersimpan dari server & localStorage
   useEffect(() => {
     if (!isOpen) return;
+
+    // Ambil dari localStorage terlebih dahulu agar instan
+    const localSaved = typeof window !== 'undefined' ? localStorage.getItem('spreadsheet_bridge_url') : '';
+    if (localSaved) {
+      setBridgeUrl(localSaved);
+    }
+
     async function loadConfig() {
       try {
         const res = await fetch('/api/settings/spreadsheet-bridge');
         const json = await res.json();
         if (json.ok && json.data?.bridgeUrl) {
           setBridgeUrl(json.data.bridgeUrl);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('spreadsheet_bridge_url', json.data.bridgeUrl);
+          }
+        } else if (localSaved) {
+          // Jika di server belum tersimpan tapi di browser ada, otomatis sinkronkan ke server
+          fetch('/api/settings/spreadsheet-bridge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bridgeUrl: localSaved }),
+          }).catch(() => {});
         }
       } catch (err) {
         console.warn('Gagal memuat config bridge:', err);
@@ -304,7 +321,8 @@ export default function AppsScriptModal({ isOpen, onClose }) {
   }
 
   async function handleSaveAndTest() {
-    if (!bridgeUrl.trim()) {
+    const cleanUrl = bridgeUrl.trim();
+    if (!cleanUrl) {
       toast.error('Masukkan URL Web App Google Apps Script');
       return;
     }
@@ -312,20 +330,25 @@ export default function AppsScriptModal({ isOpen, onClose }) {
     setSavingUrl(true);
     setTestResult(null);
 
+    // Simpan instan ke localStorage browser
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('spreadsheet_bridge_url', cleanUrl);
+    }
+
     try {
       const res = await fetch('/api/settings/spreadsheet-bridge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bridgeUrl: bridgeUrl.trim() }),
+        body: JSON.stringify({ bridgeUrl: cleanUrl }),
       });
 
       const json = await res.json();
       if (res.ok && json.ok) {
         setTestResult(json.pingResult);
         if (json.pingResult?.ok) {
-          toast.success('URL Apps Script tersimpan dan berhasil terhubung!');
+          toast.success('URL Apps Script tersimpan permanen dan berhasil terhubung!');
         } else {
-          toast.success('URL Apps Script tersimpan!');
+          toast.success('URL Apps Script berhasil disimpan secara permanen!');
         }
       } else {
         toast.error(json.error || 'Gagal menyimpan URL');

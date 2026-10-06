@@ -124,18 +124,27 @@ after insert on absence_records
 for each row
 execute function fn_auto_record_to_data_tambahan();
 
--- 7. Hak Akses RLS
+-- 7. TABEL: app_settings (Pengaturan Webhook & Konfigurasi Sistem)
+create table if not exists app_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz default now() not null
+);
+
+-- 8. Hak Akses RLS
 alter table cetak_rekap enable row level security;
 alter table list_tidak_hadir enable row level security;
 alter table data_tambahan enable row level security;
 alter table cetak_list_tidak_hadir enable row level security;
 alter table list_soft_skill enable row level security;
+alter table app_settings enable row level security;
 
 create policy "Full access cetak_rekap" on cetak_rekap for all using (true) with check (true);
 create policy "Full access list_tidak_hadir" on list_tidak_hadir for all using (true) with check (true);
 create policy "Full access data_tambahan" on data_tambahan for all using (true) with check (true);
 create policy "Full access cetak_list_tidak_hadir" on cetak_list_tidak_hadir for all using (true) with check (true);
 create policy "Full access list_soft_skill" on list_soft_skill for all using (true) with check (true);
+create policy "Full access app_settings" on app_settings for all using (true) with check (true);
 
 notify pgrst, 'reload schema';`;
 
