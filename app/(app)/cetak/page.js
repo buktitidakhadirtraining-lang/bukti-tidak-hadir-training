@@ -263,12 +263,11 @@ export default function CetakPage() {
       }
 
       const opt = {
-        margin: [6, 6, 6, 6],
+        margin: [4, 4, 4, 4],
         filename: filename,
-        image: { type: 'png' }, // Lossless PNG untuk ketajaman tulisan maksimal
+        image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
-          scale: 3, // Ultra-HD 300 DPI (3x High-Density Pixel Mapping)
-          dpi: 300,
+          scale: 2,
           letterRendering: true,
           useCORS: true,
           allowTaint: true,
@@ -283,12 +282,11 @@ export default function CetakPage() {
           format: 'a4',
           orientation: orientation,
           compress: true,
-          precision: 16,
         },
         pagebreak: {
-          mode: ['avoid-all', 'css', 'legacy'],
+          mode: ['css', 'legacy'],
           before: ['.html2pdf__page-break', '.print-page-break'],
-          avoid: ['tr', 'thead', '.print-break-avoid', '.pdf-page-container'],
+          avoid: ['tr', 'thead', '.print-break-avoid'],
         },
       };
 

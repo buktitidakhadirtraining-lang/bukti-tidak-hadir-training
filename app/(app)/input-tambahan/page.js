@@ -154,6 +154,14 @@ export default function InputTambahanPage() {
             </a>
           </div>
         </div>
+
+        {/* Petunjuk Sinkronisasi Otomatis Spreadsheet */}
+        <div className="mt-4 p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2.5 leading-relaxed">
+          <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <span className="font-bold">Info Sinkronisasi Spreadsheet:</span> Data yang diinput di bawah langsung tersimpan ke database Supabase tabel <code>data_tambahan</code>. Jika Google Spreadsheet sheet <em>Data_tambahan</em> masih belum terisi otomatis, pastikan Web App Google Apps Script di Spreadsheet Anda telah dipasang trigger atau URL Webhook Bridge telah dimasukkan di menu Cabang. Anda juga dapat menyalin data langsung ke Spreadsheet dengan tombol di tabel bawah.
+          </div>
+        </div>
       </div>
 
       {/* Form Input Data Tambahan */}
