@@ -153,7 +153,7 @@ export default function BeritaAcaraRekap({
   return (
     <div
       className="sheet text-xs leading-relaxed"
-      style={{ fontFamily: "'Times New Roman', Times, serif" }}
+      style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
     >
       {/* 1. Header Judul Berita Acara */}
       <div className="text-center space-y-0.5 mb-4">
@@ -177,55 +177,55 @@ export default function BeritaAcaraRekap({
       <div className="overflow-x-auto mb-4">
         <table
           className="w-full text-center border-collapse"
-          style={{ border: '1.5px solid #000000', fontSize: '11px' }}
+          style={{ border: '0.75px solid #000000', fontSize: '11px' }}
         >
           <thead>
             <tr style={{ backgroundColor: '#ffffff' }}>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '36px' }}
+                style={{ border: '0.75px solid #000000', width: '36px' }}
               >
                 NO
               </th>
               <th
                 className="p-1 font-bold uppercase text-left"
-                style={{ border: '1.5px solid #000000', width: '160px' }}
+                style={{ border: '0.75px solid #000000', width: '160px' }}
               >
                 JENIS TRAINING
               </th>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '75px' }}
+                style={{ border: '0.75px solid #000000', width: '75px' }}
               >
                 TARGET LSKT
               </th>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '85px' }}
+                style={{ border: '0.75px solid #000000', width: '85px' }}
               >
                 DISPENSASI
               </th>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '75px' }}
+                style={{ border: '0.75px solid #000000', width: '75px' }}
               >
                 TARGET
               </th>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '65px' }}
+                style={{ border: '0.75px solid #000000', width: '65px' }}
               >
                 HADIR
               </th>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '65px' }}
+                style={{ border: '0.75px solid #000000', width: '65px' }}
               >
                 TIDAK HADIR
               </th>
               <th
                 className="p-1 font-bold uppercase text-center"
-                style={{ border: '1.5px solid #000000' }}
+                style={{ border: '0.75px solid #000000' }}
               >
                 NO LIST PESERTA TIDAK HADIR
               </th>
@@ -235,33 +235,33 @@ export default function BeritaAcaraRekap({
             {data && data.length > 0 ? (
               data.map((row, idx) => (
                 <tr key={row.id || idx} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                  <td className="p-1 font-semibold" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1 font-semibold" style={{ border: '0.75px solid #000000' }}>
                     {row.no || idx + 1}
                   </td>
                   <td
                     className="p-1 text-left font-semibold uppercase"
-                    style={{ border: '1px solid #000000' }}
+                    style={{ border: '0.75px solid #000000' }}
                   >
                     {row.jenis_training}
                   </td>
-                  <td className="p-1" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '0.75px solid #000000' }}>
                     {row.target_lskt || ''}
                   </td>
-                  <td className="p-1" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '0.75px solid #000000' }}>
                     {row.dispensasi || ''}
                   </td>
-                  <td className="p-1" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '0.75px solid #000000' }}>
                     {row.target_tc_report || ''}
                   </td>
-                  <td className="p-1" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '0.75px solid #000000' }}>
                     {row.hadir || ''}
                   </td>
-                  <td className="p-1" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '0.75px solid #000000' }}>
                     {row.tidak_hadir || ''}
                   </td>
                   <td
                     className="p-1 font-medium text-center uppercase"
-                    style={{ border: '1px solid #000000', fontSize: '10px' }}
+                    style={{ border: '0.75px solid #000000', fontSize: '10px' }}
                   >
                     {row.no_list_peserta_tidak_hadir || ''}
                   </td>
@@ -272,7 +272,7 @@ export default function BeritaAcaraRekap({
                 <td
                   colSpan={8}
                   className="p-3 italic text-center text-gray-500"
-                  style={{ border: '1px solid #000000' }}
+                  style={{ border: '0.75px solid #000000' }}
                 >
                   Tidak ada data cetak_rekap yang tersedia.
                 </td>
@@ -318,20 +318,20 @@ export default function BeritaAcaraRekap({
       <div className="overflow-x-auto print-break-avoid" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
         <table
           className="w-full text-center border-collapse"
-          style={{ border: '1.5px solid #000000', fontSize: '11px' }}
+          style={{ border: '0.75px solid #000000', fontSize: '11px' }}
         >
           <thead>
             <tr>
               <th
                 colSpan={3}
                 className="p-1 font-bold"
-                style={{ border: '1.5px solid #000000', width: '75%' }}
+                style={{ border: '0.75px solid #000000', width: '75%' }}
               >
                 Mengetahui,
               </th>
               <th
                 className="p-1 font-bold"
-                style={{ border: '1.5px solid #000000', width: '25%' }}
+                style={{ border: '0.75px solid #000000', width: '25%' }}
               >
                 Dibuat oleh,
               </th>
@@ -342,7 +342,7 @@ export default function BeritaAcaraRekap({
               {/* Kolom 1: DBM Operasional */}
               <td
                 className="p-1.5 align-bottom"
-                style={{ border: '1.5px solid #000000', height: '85px' }}
+                style={{ border: '0.75px solid #000000', height: '85px' }}
               >
                 {ttdMode === 'ada' ? <SignatureDbmOps inkColor={inkColor} /> : <div className="h-16" />}
                 <div className="border-t border-black pt-1 mx-2">
@@ -353,7 +353,7 @@ export default function BeritaAcaraRekap({
               {/* Kolom 2: DBM Admin */}
               <td
                 className="p-1.5 align-bottom"
-                style={{ border: '1.5px solid #000000', height: '85px' }}
+                style={{ border: '0.75px solid #000000', height: '85px' }}
               >
                 {ttdMode === 'ada' ? <SignatureDbmAdmin inkColor={inkColor} /> : <div className="h-16" />}
                 <div className="border-t border-black pt-1 mx-2">
@@ -364,7 +364,7 @@ export default function BeritaAcaraRekap({
               {/* Kolom 3: HRD Manager */}
               <td
                 className="p-1.5 align-bottom"
-                style={{ border: '1.5px solid #000000', height: '85px' }}
+                style={{ border: '0.75px solid #000000', height: '85px' }}
               >
                 {ttdMode === 'ada' ? <SignatureHrdManager inkColor={inkColor} /> : <div className="h-16" />}
                 <div className="border-t border-black pt-1 mx-2">
@@ -375,7 +375,7 @@ export default function BeritaAcaraRekap({
               {/* Kolom 4: TC Supervisor */}
               <td
                 className="p-1.5 align-bottom"
-                style={{ border: '1.5px solid #000000', height: '85px' }}
+                style={{ border: '0.75px solid #000000', height: '85px' }}
               >
                 {ttdMode === 'ada' ? <SignatureTcSupervisor inkColor={inkColor} /> : <div className="h-16" />}
                 <div className="border-t border-black pt-1 mx-2">

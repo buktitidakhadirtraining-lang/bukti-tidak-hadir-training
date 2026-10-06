@@ -19,7 +19,7 @@ export default function BeritaAcaraSoftSkill({
   return (
     <div
       className="sheet text-xs leading-relaxed"
-      style={{ fontFamily: "'Times New Roman', Times, serif" }}
+      style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
     >
       {/* 1. Header Judul Berita Acara Soft Skill (Sesuai Gambar 7) */}
       <div className="text-center space-y-0.5 mb-4">
@@ -61,43 +61,43 @@ export default function BeritaAcaraSoftSkill({
       <div className="overflow-x-auto mb-4">
         <table
           className="w-full text-left border-collapse"
-          style={{ border: '1.5px solid #000000', fontSize: '11px' }}
+          style={{ border: '0.75px solid #000000', fontSize: '11px' }}
         >
           <thead>
             <tr style={{ backgroundColor: '#1E60D5', color: '#ffffff' }}>
               <th
                 className="p-1 font-bold uppercase text-center"
-                style={{ border: '1.5px solid #000000', width: '36px' }}
+                style={{ border: '0.75px solid #000000', width: '36px' }}
               >
                 No
               </th>
               <th
                 className="p-1 font-bold uppercase text-center"
-                style={{ border: '1.5px solid #000000', width: '105px' }}
+                style={{ border: '0.75px solid #000000', width: '105px' }}
               >
                 NIK
               </th>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000' }}
+                style={{ border: '0.75px solid #000000' }}
               >
                 Nama
               </th>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '160px' }}
+                style={{ border: '0.75px solid #000000', width: '160px' }}
               >
                 Jabatan
               </th>
               <th
                 className="p-1 font-bold uppercase text-center"
-                style={{ border: '1.5px solid #000000', width: '90px' }}
+                style={{ border: '0.75px solid #000000', width: '90px' }}
               >
                 Kategori
               </th>
               <th
                 className="p-1 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '130px' }}
+                style={{ border: '0.75px solid #000000', width: '130px' }}
               >
                 Detail Alasan
               </th>
@@ -109,37 +109,37 @@ export default function BeritaAcaraSoftSkill({
                 <tr key={row.id || `${row.nik}-${idx}`} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                   <td
                     className="p-1 text-center font-bold"
-                    style={{ border: '1px solid #000000' }}
+                    style={{ border: '0.75px solid #000000' }}
                   >
                     {row.no || idx + 1}
                   </td>
                   <td
                     className="p-1 text-center font-mono font-bold"
-                    style={{ border: '1px solid #000000' }}
+                    style={{ border: '0.75px solid #000000' }}
                   >
                     {row.nik}
                   </td>
                   <td
                     className="p-1 uppercase font-semibold text-black"
-                    style={{ border: '1px solid #000000' }}
+                    style={{ border: '0.75px solid #000000' }}
                   >
                     {row.nama}
                   </td>
                   <td
                     className="p-1 font-medium"
-                    style={{ border: '1px solid #000000' }}
+                    style={{ border: '0.75px solid #000000' }}
                   >
                     {row.jabatan}
                   </td>
                   <td
                     className="p-1 text-center font-medium"
-                    style={{ border: '1px solid #000000' }}
+                    style={{ border: '0.75px solid #000000' }}
                   >
                     {row.kategory || row.kategori || '-'}
                   </td>
                   <td
                     className="p-1 font-medium"
-                    style={{ border: '1px solid #000000' }}
+                    style={{ border: '0.75px solid #000000' }}
                   >
                     {row.detail_alasan || '-'}
                   </td>
@@ -150,7 +150,7 @@ export default function BeritaAcaraSoftSkill({
                 <td
                   colSpan={6}
                   className="p-3 italic text-center text-gray-500"
-                  style={{ border: '1px solid #000000' }}
+                  style={{ border: '0.75px solid #000000' }}
                 >
                   Tidak ada data peserta soft skill yang tersedia.
                 </td>

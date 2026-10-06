@@ -116,21 +116,54 @@ export default function LampiranListTidakHadir({
   const totalSheetsCount = sheets.length;
 
   return (
-    <div className="lampiran-container text-black">
+    <div
+      className="lampiran-container text-black"
+      style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
+    >
       {sheets.map((sheet, sheetIdx) => {
         const isLastSheet = sheetIdx === totalSheetsCount - 1;
+        const itemCount = sheet.items ? sheet.items.length : 0;
+        // Pengecekan ukuran font dan padding: jika > 30 baris, gunakan 8.5pt dan 1.2mm
+        const cellFontSize = itemCount > 30 ? '8.5pt' : '9pt';
+        const cellPadding = itemCount > 30 ? '1.2mm 2mm' : '1.6mm 2mm';
 
         return (
           <div
             key={sheet.sheetId}
             className={`sheet ${isLastSheet ? 'last-sheet' : ''}`}
+            style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
           >
-            {/* Header Lembar A4 (Sesuai Aturan 1: Dalam alur normal dokumen) */}
-            <div className="sheet-header text-center mb-3">
-              <h1 className="text-[13pt] font-bold tracking-wide uppercase leading-tight text-black m-0 p-0 font-serif">
+            {/* Header Lembar A4 */}
+            <div className="sheet-header text-center" style={{ marginBottom: '0' }}>
+              <h1
+                style={{
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontSize: '15pt',
+                  fontWeight: 'bold',
+                  textAlign: 'center',
+                  textTransform: 'uppercase',
+                  color: '#000000',
+                  margin: 0,
+                  padding: 0,
+                  lineHeight: '1.2',
+                }}
+              >
                 LAMPIRAN DETAIL PESERTA TIDAK HADIR
               </h1>
-              <h2 className="text-[12pt] font-bold tracking-wide uppercase leading-tight text-black mt-1 m-0 p-0 font-serif">
+              <h2
+                style={{
+                  fontFamily: 'Arial, Helvetica, sans-serif',
+                  fontSize: '12pt',
+                  fontWeight: 'bold',
+                  textAlign: 'center',
+                  textTransform: 'uppercase',
+                  color: '#000000',
+                  marginTop: '2mm',
+                  marginBottom: '6mm',
+                  padding: 0,
+                  lineHeight: '1.2',
+                }}
+              >
                 JENIS TRAINING: {sheet.training}
               </h2>
             </div>
@@ -138,7 +171,10 @@ export default function LampiranListTidakHadir({
             {/* Tabel / Konten Lembar */}
             <div className="sheet-body w-full">
               {sheet.isEmpty ? (
-                <div className="p-12 text-center text-gray-500 italic border border-black rounded mt-4">
+                <div
+                  className="p-12 text-center text-gray-500 rounded"
+                  style={{ border: '0.75px solid #000000', fontFamily: 'Arial, Helvetica, sans-serif' }}
+                >
                   Tidak ada data peserta tidak hadir.
                 </div>
               ) : (
@@ -148,84 +184,109 @@ export default function LampiranListTidakHadir({
                     tableLayout: 'fixed',
                     width: '100%',
                     borderCollapse: 'collapse',
-                    border: '1.5px solid #000000',
+                    border: '0.75px solid #000000',
+                    fontFamily: 'Arial, Helvetica, sans-serif',
                   }}
                 >
                   <thead>
-                    <tr style={{ backgroundColor: '#ffffff' }}>
+                    <tr style={{ backgroundColor: '#f2f2f2' }}>
                       <th
-                        className="font-bold uppercase text-center text-black"
                         style={{
-                          border: '1.5px solid #000000',
+                          border: '0.75px solid #000000',
                           width: '5%',
-                          padding: '1mm 2mm',
-                          fontSize: '9pt',
+                          padding: cellPadding,
+                          fontSize: cellFontSize,
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                          whiteSpace: 'nowrap',
+                          color: '#000000',
                         }}
                       >
                         NO
                       </th>
                       <th
-                        className="font-bold uppercase text-center text-black"
                         style={{
-                          border: '1.5px solid #000000',
+                          border: '0.75px solid #000000',
                           width: '14%',
-                          padding: '1mm 2mm',
-                          fontSize: '9pt',
+                          padding: cellPadding,
+                          fontSize: cellFontSize,
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                          color: '#000000',
                         }}
                       >
                         TRAINING
                       </th>
                       <th
-                        className="font-bold uppercase text-center text-black"
                         style={{
-                          border: '1.5px solid #000000',
-                          width: '14%',
-                          padding: '1mm 2mm',
-                          fontSize: '9pt',
+                          border: '0.75px solid #000000',
+                          width: '13%',
+                          padding: cellPadding,
+                          fontSize: cellFontSize,
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                          whiteSpace: 'nowrap',
+                          color: '#000000',
                         }}
                       >
                         NIK
                       </th>
                       <th
-                        className="font-bold uppercase text-black text-left"
                         style={{
-                          border: '1.5px solid #000000',
-                          width: '25%',
-                          padding: '1mm 2mm',
-                          fontSize: '9pt',
+                          border: '0.75px solid #000000',
+                          width: '24%',
+                          padding: cellPadding,
+                          fontSize: cellFontSize,
+                          fontWeight: 'bold',
+                          textAlign: 'left',
+                          verticalAlign: 'middle',
+                          color: '#000000',
                         }}
                       >
                         NAMA
                       </th>
                       <th
-                        className="font-bold uppercase text-center text-black"
                         style={{
-                          border: '1.5px solid #000000',
-                          width: '10%',
-                          padding: '1mm 2mm',
-                          fontSize: '9pt',
+                          border: '0.75px solid #000000',
+                          width: '9%',
+                          padding: cellPadding,
+                          fontSize: cellFontSize,
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                          whiteSpace: 'nowrap',
+                          color: '#000000',
                         }}
                       >
                         KD TOKO
                       </th>
                       <th
-                        className="font-bold uppercase text-black text-left"
                         style={{
-                          border: '1.5px solid #000000',
+                          border: '0.75px solid #000000',
                           width: '20%',
-                          padding: '1mm 2mm',
-                          fontSize: '9pt',
+                          padding: cellPadding,
+                          fontSize: cellFontSize,
+                          fontWeight: 'bold',
+                          textAlign: 'left',
+                          verticalAlign: 'middle',
+                          color: '#000000',
                         }}
                       >
                         NAMA TOKO
                       </th>
                       <th
-                        className="font-bold uppercase text-black text-left"
                         style={{
-                          border: '1.5px solid #000000',
-                          width: '12%',
-                          padding: '1mm 2mm',
-                          fontSize: '9pt',
+                          border: '0.75px solid #000000',
+                          width: '15%',
+                          padding: cellPadding,
+                          fontSize: cellFontSize,
+                          fontWeight: 'bold',
+                          textAlign: 'left',
+                          verticalAlign: 'middle',
+                          color: '#000000',
                         }}
                       >
                         ALASAN TIDAK HADIR
@@ -236,92 +297,111 @@ export default function LampiranListTidakHadir({
                     {sheet.items.map((row, rIdx) => {
                       const rowNumber = sheet.startIndex + rIdx + 1;
                       return (
-                        <tr key={row.id || `${row.nik}-${rIdx}`} style={{ height: '6mm' }}>
+                        <tr key={row.id || `${row.nik}-${rIdx}`}>
                           <td
-                            className="text-center font-medium text-black"
                             style={{
-                              border: '1px solid #000000',
-                              padding: '1mm 2mm',
-                              fontSize: '9pt',
-                              lineHeight: '1.2',
+                              border: '0.75px solid #000000',
+                              padding: cellPadding,
+                              fontSize: cellFontSize,
+                              lineHeight: '1.3',
+                              textAlign: 'center',
+                              verticalAlign: 'middle',
+                              whiteSpace: 'nowrap',
+                              color: '#000000',
                             }}
                           >
                             {rowNumber}
                           </td>
                           <td
-                            className="text-center uppercase font-medium text-black"
                             style={{
-                              border: '1px solid #000000',
-                              padding: '1mm 2mm',
-                              fontSize: '9pt',
-                              lineHeight: '1.2',
+                              border: '0.75px solid #000000',
+                              padding: cellPadding,
+                              fontSize: cellFontSize,
+                              lineHeight: '1.3',
+                              textAlign: 'center',
+                              verticalAlign: 'middle',
+                              textTransform: 'uppercase',
                               wordBreak: 'break-word',
                               overflowWrap: 'anywhere',
+                              color: '#000000',
                             }}
                           >
                             {row.training}
                           </td>
                           <td
-                            className="text-center font-mono font-medium text-black"
                             style={{
-                              border: '1px solid #000000',
-                              padding: '1mm 2mm',
-                              fontSize: '9pt',
-                              lineHeight: '1.2',
-                              wordBreak: 'break-word',
-                              overflowWrap: 'anywhere',
+                              border: '0.75px solid #000000',
+                              padding: cellPadding,
+                              fontSize: cellFontSize,
+                              lineHeight: '1.3',
+                              textAlign: 'center',
+                              verticalAlign: 'middle',
+                              whiteSpace: 'nowrap',
+                              fontVariantNumeric: 'tabular-nums',
+                              color: '#000000',
                             }}
                           >
                             {row.nik}
                           </td>
                           <td
-                            className="uppercase font-medium text-black"
                             style={{
-                              border: '1px solid #000000',
-                              padding: '1mm 2mm',
-                              fontSize: '9pt',
-                              lineHeight: '1.2',
+                              border: '0.75px solid #000000',
+                              padding: cellPadding,
+                              fontSize: cellFontSize,
+                              lineHeight: '1.3',
+                              textAlign: 'left',
+                              verticalAlign: 'middle',
+                              textTransform: 'uppercase',
                               wordBreak: 'break-word',
                               overflowWrap: 'anywhere',
+                              color: '#000000',
                             }}
                           >
                             {row.nama}
                           </td>
                           <td
-                            className="text-center uppercase font-medium text-black"
                             style={{
-                              border: '1px solid #000000',
-                              padding: '1mm 2mm',
-                              fontSize: '9pt',
-                              lineHeight: '1.2',
-                              wordBreak: 'break-word',
-                              overflowWrap: 'anywhere',
+                              border: '0.75px solid #000000',
+                              padding: cellPadding,
+                              fontSize: cellFontSize,
+                              lineHeight: '1.3',
+                              textAlign: 'center',
+                              verticalAlign: 'middle',
+                              whiteSpace: 'nowrap',
+                              textTransform: 'uppercase',
+                              color: '#000000',
                             }}
                           >
                             {row.kd_toko || '-'}
                           </td>
                           <td
-                            className="uppercase font-medium text-black"
                             style={{
-                              border: '1px solid #000000',
-                              padding: '1mm 2mm',
-                              fontSize: '9pt',
-                              lineHeight: '1.2',
+                              border: '0.75px solid #000000',
+                              padding: cellPadding,
+                              fontSize: cellFontSize,
+                              lineHeight: '1.3',
+                              textAlign: 'left',
+                              verticalAlign: 'middle',
+                              textTransform: 'uppercase',
                               wordBreak: 'break-word',
                               overflowWrap: 'anywhere',
+                              color: '#000000',
                             }}
                           >
                             {row.nama_toko || '-'}
                           </td>
                           <td
-                            className="uppercase font-medium text-black"
                             style={{
-                              border: '1px solid #000000',
-                              padding: '1mm 2mm',
-                              fontSize: '9pt',
-                              lineHeight: '1.2',
+                              border: '0.75px solid #000000',
+                              padding: cellPadding,
+                              fontSize: cellFontSize,
+                              lineHeight: '1.3',
+                              textAlign: 'left',
+                              verticalAlign: 'middle',
+                              textTransform: 'uppercase',
                               wordBreak: 'break-word',
                               overflowWrap: 'anywhere',
+                              color: '#000000',
                             }}
                           >
                             {row.alasan_tidak_hadir || '-'}
@@ -334,15 +414,22 @@ export default function LampiranListTidakHadir({
               )}
             </div>
 
-            {/* Footer Lembar A4 (Sesuai Aturan 1: Pakai margin-top: auto, bukan position: absolute) */}
+            {/* Footer Lembar A4 */}
             <div
-              className="sheet-footer pt-2 border-t border-black flex items-center justify-between text-black text-[8.5pt]"
-              style={{ marginTop: 'auto' }}
+              className="sheet-footer pt-2 flex items-center justify-between"
+              style={{
+                marginTop: 'auto',
+                borderTop: '0.75px solid #000000',
+                color: '#555555',
+                fontSize: '8pt',
+                fontFamily: 'Arial, Helvetica, sans-serif',
+                fontStyle: 'normal',
+              }}
             >
-              <span className="italic text-gray-800">
+              <span style={{ color: '#555555', fontStyle: 'normal' }}>
                 Dokumen Rekapitulasi Ketidakhadiran Peserta Training &bull; Jenis Training: {sheet.training} ({sheet.totalItemsInGroup} Peserta)
               </span>
-              <span className="font-bold text-black">
+              <span style={{ color: '#000000', fontWeight: 'bold' }}>
                 Halaman {sheet.pageNumber}
               </span>
             </div>

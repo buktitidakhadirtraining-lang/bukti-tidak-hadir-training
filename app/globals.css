@@ -46,6 +46,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sheet {
+  font-family: Arial, Helvetica, sans-serif !important;
   box-sizing: border-box !important;
   width: 210mm !important;
   height: 296mm !important;
@@ -62,6 +63,21 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   border: 1px solid #e2e8f0;
   border-radius: 4px;
+}
+
+.sheet h1,
+.sheet h2,
+.sheet h3,
+.sheet h4,
+.sheet h5,
+.sheet h6,
+.sheet table,
+.sheet td,
+.sheet th,
+.sheet div,
+.sheet span,
+.sheet p {
+  font-family: Arial, Helvetica, sans-serif !important;
 }
 
 .sheet:not(:last-child) {
