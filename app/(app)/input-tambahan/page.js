@@ -13,9 +13,11 @@ import {
   ArrowRight,
   ExternalLink,
   Sparkles,
+  Code2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SPREADSHEET_URL } from '../../../lib/config.js';
+import AppsScriptModal from '../../../components/AppsScriptModal.js';
 
 export default function InputTambahanPage() {
   const [training, setTraining] = useState('YFC');
@@ -30,6 +32,7 @@ export default function InputTambahanPage() {
   const [records, setRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [meta, setMeta] = useState(null);
+  const [showScriptModal, setShowScriptModal] = useState(false);
 
   // Ambil meta alasan & training
   useEffect(() => {
@@ -143,7 +146,16 @@ export default function InputTambahanPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowScriptModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-[#0056b3] rounded-xl text-xs font-bold transition-all border border-blue-200"
+            >
+              <Code2 className="w-3.5 h-3.5" />
+              <span>Kode & Panduan Apps Script (Code.gs)</span>
+            </button>
+
             <a
               href={SPREADSHEET_URL}
               target="_blank"
@@ -157,11 +169,20 @@ export default function InputTambahanPage() {
         </div>
 
         {/* Petunjuk Sinkronisasi Otomatis Spreadsheet */}
-        <div className="mt-4 p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2.5 leading-relaxed">
-          <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <span className="font-bold">Info Sinkronisasi Spreadsheet:</span> Data yang diinput di bawah langsung tersimpan ke database Supabase tabel <code>data_tambahan</code>. Jika Google Spreadsheet sheet <em>Data_tambahan</em> masih belum terisi otomatis, pastikan Web App Google Apps Script di Spreadsheet Anda telah dipasang trigger atau URL Webhook Bridge telah dimasukkan di menu Cabang. Anda juga dapat menyalin data langsung ke Spreadsheet dengan tombol di tabel bawah.
+        <div className="mt-4 p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 leading-relaxed">
+          <div className="flex items-start gap-2.5">
+            <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-bold">Info Sinkronisasi Otomatis Spreadsheet:</span> Data yang diinput di bawah langsung tersimpan ke Supabase tabel <code>data_tambahan</code>. Agar otomatis langsung tercatat di sheet <strong>Data_tambahan</strong> Google Spreadsheet Anda, silakan pasang skrip <code>Code.gs</code> di Spreadsheet Anda.
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setShowScriptModal(true)}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shrink-0 self-start sm:self-auto transition-colors"
+          >
+            Lihat Kode Code.gs
+          </button>
         </div>
       </div>
 
@@ -398,6 +419,12 @@ export default function InputTambahanPage() {
           </table>
         </div>
       </div>
+
+      {/* Modal Kode & Panduan Google Apps Script */}
+      <AppsScriptModal
+        isOpen={showScriptModal}
+        onClose={() => setShowScriptModal(false)}
+      />
     </div>
   );
 }

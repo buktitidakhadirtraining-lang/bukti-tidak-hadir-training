@@ -1,193 +1,271 @@
 /**
- * GOOGLE APPS SCRIPT DRIVE BRIDGE
- * Sistem Data Ketidakhadiran Peserta Training Indomaret
- * Dibuat oleh Bang Ajiib (2026)
+ * GOOGLE APPS SCRIPT WEBHOOK BRIDGE (Code.gs)
+ * Untuk Google Spreadsheet Rekap & Data Tambahan:
+ * https://docs.google.com/spreadsheets/d/1X9rBiIzAo-PHIAPAFcAU3ElpHBSVDga_BftgSeqWdqY
  *
- * INSTRUKSI KONFIGURASI:
- * 1. Ganti ROOT_FOLDER_ID dengan ID folder Google Drive cabang Anda
- *    (Contoh: buka folder di browser, salin kode setelah /folders/...)
- * 2. Ganti SHARED_SECRET dengan kata sandi rahasia cabang yang kuat
- * 3. Deploy > New Deployment > Web App > Execute as: Me > Who has access: Anyone
+ * FUNGSI UTAMA:
+ * 1. Otomatis menerima data baru dari form "Input Data Tambahan" website
+ *    dan mencatatnya langsung ke sheet "Data_tambahan".
+ * 2. Menyediakan fungsi upload bukti ke Google Drive cabang.
+ * 3. Menangani ping/tes koneksi dari sistem website.
+ *
+ * CARA PASANG:
+ * 1. Buka Google Spreadsheet Anda.
+ * 2. Klik menu: Extensions (Ekstensi) > Apps Script.
+ * 3. Hapus seluruh isi di editor, lalu salin (paste) SELURUH KODE DI BAWAH INI.
+ * 4. Klik ikon Disket (Save / Simpan).
+ * 5. Klik tombol biru: Deploy (Terapkan) > New deployment (Penerapan baru).
+ * 6. Klik ikon gerigi di kiri atas > Pilih "Web app".
+ * 7. Atur pengaturannya:
+ *    - Description: Webhook Data Tambahan & Drive Bridge
+ *    - Execute as: Me (email akun Anda)
+ *    - Who has access: Anyone (Siapa saja)  <-- WAJIB PILIH ANYONE
+ * 8. Klik tombol "Deploy" (Terapkan).
+ * 9. Berikan izin otorisasi jika diminta (Authorize access > Pilih akun Google > Advanced > Go to Untitled project).
+ * 10. Salin URL Web App yang muncul (berakhiran /exec).
+ * 11. Masukkan URL tersebut ke aplikasi website (Menu Admin Cabang atau Pengaturan Webhook).
  */
 
 // ==============================================================================
-// KONFIGURASI CABANG (SESUAIKAN 2 BARIS INI)
+// 1. KONFIGURASI UTAMA
 // ==============================================================================
-var ROOT_FOLDER_ID = 'MASUKKAN_ID_FOLDER_GOOGLE_DRIVE_CABANG_DISINI';
-var SHARED_SECRET = 'MASUKKAN_SHARED_SECRET_CABANG_DISINI';
+// Ganti ID Folder di bawah jika Anda juga menggunakan Google Drive untuk upload foto bukti
+var ROOT_FOLDER_ID = 'MASUKKAN_ID_FOLDER_GOOGLE_DRIVE_DISINI'; 
+
+// Ganti atau samakan dengan SECRET di aplikasi website (bebas Anda tentukan)
+var SHARED_SECRET = 'indomaret2026';
+
+// Nama sheet target untuk pencatatan otomatis data tambahan
+var SHEET_DATA_TAMBAHAN_NAME = 'Data_tambahan';
 
 // ==============================================================================
-// ENTRY POINT WEB APP (HTTP POST)
+// 2. ENTRY POINT HTTP POST (Menerima kiriman data dari sistem website)
 // ==============================================================================
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
-      return jsonResponse({ ok: false, error: 'Tidak ada data payload yang dikirim' }, 400);
+      return jsonResponse({ ok: false, error: 'Tidak ada data payload yang dikirim' });
     }
 
-    var requestData;
+    var payload;
     try {
-      requestData = JSON.parse(e.postData.contents);
+      payload = JSON.parse(e.postData.contents);
     } catch (parseErr) {
-      return jsonResponse({ ok: false, error: 'Format payload harus berupa JSON yang valid' }, 400);
+      return jsonResponse({ ok: false, error: 'Payload harus berupa JSON: ' + parseErr.toString() });
     }
 
-    // 1. Verifikasi Kata Sandi Rahasia (SHARED_SECRET)
-    if (!requestData.secret || requestData.secret !== SHARED_SECRET) {
-      return jsonResponse({ ok: false, error: 'Secret Key Drive Bridge salah atau tidak sesuai' }, 403);
+    var action = payload.action;
+
+    // Aksi 1: PENCATATAN OTOMATIS DATA TAMBAHAN KE SPREADSHEET
+    if (action === 'append_data_tambahan') {
+      return handleAppendDataTambahan(payload);
     }
 
-    var action = requestData.action;
-
-    // 2. Routing Aksi
-    switch (action) {
-      case 'ping':
-        return handlePing();
-
-      case 'upload':
-        return handleUpload(requestData);
-
-      case 'get':
-        return handleGet(requestData);
-
-      case 'trash':
-        return handleTrash(requestData);
-
-      default:
-        return jsonResponse({ ok: false, error: 'Aksi "' + action + '" tidak dikenali' }, 400);
+    // Aksi 2: TES KONEKSI DARI WEBSITE (PING)
+    if (action === 'ping') {
+      return jsonResponse({
+        ok: true,
+        message: 'Koneksi ke Google Apps Script Web App berhasil aktif!',
+        timestamp: new Date().toISOString()
+      });
     }
-  } catch (globalErr) {
-    return jsonResponse({
-      ok: false,
-      error: 'Terjadi kesalahan internal pada Google Apps Script: ' + globalErr.toString()
-    }, 500);
-  }
-}
 
-// ==============================================================================
-// HANDLER: PING (TEST KONEKSI & VERIFIKASI FOLDER)
-// ==============================================================================
-function handlePing() {
-  try {
-    var folder = DriveApp.getFolderById(ROOT_FOLDER_ID);
-    return jsonResponse({
-      ok: true,
-      folderName: folder.getName(),
-      message: 'Koneksi ke Google Drive Cabang berhasil terverifikasi'
-    });
+    // Aksi 3: UPLOAD FOTO BUKTI KE GOOGLE DRIVE
+    if (action === 'upload') {
+      return handleUploadDrive(payload);
+    }
+
+    // Aksi 4: BACA FOTO BUKTI DARI GOOGLE DRIVE
+    if (action === 'get') {
+      return handleGetDrive(payload);
+    }
+
+    // Aksi 5: HAPUS FILE GOOGLE DRIVE
+    if (action === 'trash') {
+      return handleTrashDrive(payload);
+    }
+
+    return jsonResponse({ ok: false, error: 'Aksi "' + action + '" tidak dikenali' });
+
   } catch (err) {
     return jsonResponse({
       ok: false,
-      error: 'Gagal mengakses folder Google Drive: ' + err.toString() + '. Periksa kembali ROOT_FOLDER_ID.'
+      error: 'Terjadi error internal di Apps Script: ' + err.toString()
     });
   }
 }
 
 // ==============================================================================
-// HANDLER: UPLOAD (UNGGAH FILE BUKTI KE FOLDER CABANG)
+// 3. HANDLER: MENCATAT DATA TAMBAHAN KE GOOGLE SPREADSHEET
 // ==============================================================================
-function handleUpload(data) {
+function handleAppendDataTambahan(payload) {
   try {
-    var fileName = data.fileName || ('bukti_' + new Date().getTime() + '.jpg');
-    var mimeType = data.mimeType || 'image/jpeg';
-    var base64 = data.base64;
+    var ss;
+    if (payload.spreadsheetId) {
+      try {
+        ss = SpreadsheetApp.openById(payload.spreadsheetId);
+      } catch (openErr) {
+        ss = SpreadsheetApp.getActiveSpreadsheet();
+      }
+    } else {
+      ss = SpreadsheetApp.getActiveSpreadsheet();
+    }
+
+    if (!ss) {
+      return jsonResponse({
+        ok: false,
+        error: 'Spreadsheet tidak ditemukan. Pastikan skrip ini terpasang di Spreadsheet target.'
+      });
+    }
+
+    var sheetName = payload.sheet || SHEET_DATA_TAMBAHAN_NAME;
+    var sheet = ss.getSheetByName(sheetName);
+
+    // Jika sheet belum ada, buatkan sheet baru secara otomatis
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      // Buat header standar resmi sesuai format:
+      // NO | TRAINING | NIK | NAMA | KD TOKO | NAMA TOKO | ALASAN TIDAK HADIR
+      sheet.appendRow([
+        'NO',
+        'TRAINING',
+        'NIK',
+        'NAMA',
+        'KD TOKO',
+        'NAMA TOKO',
+        'ALASAN TIDAK HADIR'
+      ]);
+      
+      // Berikan style header rapi
+      var headerRange = sheet.getRange(1, 1, 1, 7);
+      headerRange.setFontWeight('bold');
+      headerRange.setBackground('#4CAF50');
+      headerRange.setFontColor('#FFFFFF');
+    }
+
+    var rowData = payload.row;
+    if (!rowData || !Array.isArray(rowData)) {
+      return jsonResponse({
+        ok: false,
+        error: 'Data baris (row) tidak valid atau kosong'
+      });
+    }
+
+    // Hitung nomor urut berikutnya jika baris pertama (NO) kosong atau 0
+    var lastRow = sheet.getLastRow();
+    if (!rowData[0] || rowData[0] === 0) {
+      rowData[0] = lastRow > 1 ? (lastRow) : 1;
+    }
+
+    // Pastikan NIK dan Kode Toko disimpan sebagai string (agar angka 0 di depan tidak hilang)
+    var formattedRow = [
+      rowData[0],
+      String(rowData[1] || ''),
+      "'" + String(rowData[2] || ''), // Tanda petik agar terbaca teks di spreadsheet
+      String(rowData[3] || ''),
+      String(rowData[4] || ''),
+      String(rowData[5] || ''),
+      String(rowData[6] || '')
+    ];
+
+    // Sisipkan baris baru ke paling bawah sheet Data_tambahan
+    sheet.appendRow(formattedRow);
+
+    return jsonResponse({
+      ok: true,
+      message: 'Data tambahan berhasil dicatat ke sheet ' + sheetName,
+      rowNumber: sheet.getLastRow(),
+      insertedData: formattedRow
+    });
+
+  } catch (sheetErr) {
+    return jsonResponse({
+      ok: false,
+      error: 'Gagal menulis ke Spreadsheet: ' + sheetErr.toString()
+    });
+  }
+}
+
+// ==============================================================================
+// 4. HANDLER GOOGLE DRIVE (UPLOAD FOTO BUKTI)
+// ==============================================================================
+function handleUploadDrive(payload) {
+  try {
+    var fileName = payload.fileName || ('bukti_' + new Date().getTime() + '.jpg');
+    var mimeType = payload.mimeType || 'image/jpeg';
+    var base64 = payload.base64;
 
     if (!base64) {
-      return jsonResponse({ ok: false, error: 'Konten base64 file wajib disertakan' });
+      return jsonResponse({ ok: false, error: 'Konten file base64 wajib ada' });
     }
 
-    var decodedBytes = Utilities.base64Decode(base64);
-    var blob = Utilities.newBlob(decodedBytes, mimeType, fileName);
+    var decoded = Utilities.base64Decode(base64);
+    var blob = Utilities.newBlob(decoded, mimeType, fileName);
 
-    var targetFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
-    var createdFile = targetFolder.createFile(blob);
+    var folder;
+    try {
+      folder = DriveApp.getFolderById(ROOT_FOLDER_ID);
+    } catch (e) {
+      folder = DriveApp.getRootFolder();
+    }
+
+    var file = folder.createFile(blob);
 
     return jsonResponse({
       ok: true,
-      fileId: createdFile.getId(),
-      fileName: createdFile.getName(),
-      webViewLink: createdFile.getUrl()
+      fileId: file.getId(),
+      fileName: file.getName(),
+      webViewLink: file.getUrl()
     });
   } catch (err) {
-    return jsonResponse({
-      ok: false,
-      error: 'Gagal mengunggah file ke Google Drive: ' + err.toString()
-    });
+    return jsonResponse({ ok: false, error: 'Gagal upload ke Drive: ' + err.toString() });
   }
 }
 
-// ==============================================================================
-// HANDLER: GET (BACA KONTEN FILE UNTUK PRATINJAU)
-// ==============================================================================
-function handleGet(data) {
+function handleGetDrive(payload) {
   try {
-    var fileId = data.fileId;
-    if (!fileId) {
-      return jsonResponse({ ok: false, error: 'Parameter fileId wajib disertakan' });
-    }
-
-    var file = DriveApp.getFileById(fileId);
+    var file = DriveApp.getFileById(payload.fileId);
     var blob = file.getBlob();
-    var base64String = Utilities.base64Encode(blob.getBytes());
-
     return jsonResponse({
       ok: true,
       name: file.getName(),
       mimeType: file.getMimeType(),
-      base64: base64String
+      base64: Utilities.base64Encode(blob.getBytes())
     });
   } catch (err) {
-    return jsonResponse({
-      ok: false,
-      error: 'Gagal mengambil file dari Google Drive: ' + err.toString()
-    });
+    return jsonResponse({ ok: false, error: 'Gagal membaca file: ' + err.toString() });
   }
 }
 
-// ==============================================================================
-// HANDLER: TRASH (HAPUS / PINDAHKAN FILE KE TEMPAT SAMPAH)
-// ==============================================================================
-function handleTrash(data) {
+function handleTrashDrive(payload) {
   try {
-    var fileId = data.fileId;
-    if (!fileId) {
-      return jsonResponse({ ok: true, message: 'Tidak ada fileId untuk dihapus' });
-    }
-
-    var file = DriveApp.getFileById(fileId);
+    if (!payload.fileId) return jsonResponse({ ok: true });
+    var file = DriveApp.getFileById(payload.fileId);
     file.setTrashed(true);
-
-    return jsonResponse({
-      ok: true,
-      message: 'File berhasil dipindahkan ke tempat sampah Google Drive'
-    });
+    return jsonResponse({ ok: true, message: 'File berhasil dihapus' });
   } catch (err) {
-    return jsonResponse({
-      ok: false,
-      error: 'Gagal memindahkan file ke sampah: ' + err.toString()
-    });
+    return jsonResponse({ ok: false, error: err.toString() });
   }
 }
 
 // ==============================================================================
-// HELPER: FORMAT OUTPUT JSON
-// ==============================================================================
-function jsonResponse(obj, statusCode) {
-  var output = ContentService.createTextOutput(JSON.stringify(obj));
-  output.setMimeType(ContentService.MimeType.JSON);
-  return output;
-}
-
-// ==============================================================================
-// HANDLER GET (INFO CEK STATUS)
+// 5. ENTRY POINT HTTP GET (Untuk cek status di browser)
 // ==============================================================================
 function doGet(e) {
   return ContentService.createTextOutput(
     JSON.stringify({
       status: 'active',
-      service: 'Google Apps Script Drive Bridge - Training Attendance System',
-      version: '1.0.0',
+      service: 'Google Apps Script Webhook Bridge - Data Tambahan & Drive',
+      version: '2.0.0',
+      spreadsheet: '1X9rBiIzAo-PHIAPAFcAU3ElpHBSVDga_BftgSeqWdqY',
       timestamp: new Date().toISOString()
     })
   ).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Helper pengembalian response JSON
+function jsonResponse(obj) {
+  var output = ContentService.createTextOutput(JSON.stringify(obj));
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
 }
