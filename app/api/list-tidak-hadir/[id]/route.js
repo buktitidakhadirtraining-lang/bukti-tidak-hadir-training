@@ -1,17 +1,14 @@
-// app/api/data-tambahan/[id]/route.js
+// app/api/list-tidak-hadir/[id]/route.js
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '../../../../lib/session.js';
 import {
-  updateDataTambahanRecord,
-  deleteDataTambahanRecord,
+  updateListTidakHadirRecord,
+  deleteListTidakHadirRecord,
 } from '../../../../lib/data-service.js';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-/**
- * PUT: Edit data tambahan berdasarkan ID
- */
 export async function PUT(request, { params }) {
   try {
     const session = await getSessionFromRequest(request);
@@ -27,7 +24,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ ok: false, error: 'NIK dan Nama wajib diisi' }, { status: 400 });
     }
 
-    const updated = await updateDataTambahanRecord(
+    const updated = await updateListTidakHadirRecord(
       id,
       {
         training,
@@ -43,21 +40,18 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json({
       ok: true,
-      message: 'Data tambahan berhasil diperbarui',
+      message: 'Data peserta tidak hadir berhasil diperbarui',
       data: updated,
     });
   } catch (err) {
-    console.error('[API Data Tambahan PUT Error]:', err);
+    console.error('[API List Tidak Hadir PUT Error]:', err);
     return NextResponse.json(
-      { ok: false, error: err.message || 'Gagal memperbarui data tambahan' },
+      { ok: false, error: err.message || 'Gagal memperbarui data' },
       { status: 500 }
     );
   }
 }
 
-/**
- * DELETE: Hapus 1 baris data tambahan berdasarkan ID
- */
 export async function DELETE(request, { params }) {
   try {
     const session = await getSessionFromRequest(request);
@@ -66,16 +60,16 @@ export async function DELETE(request, { params }) {
     }
 
     const { id } = await params;
-    await deleteDataTambahanRecord(id, session);
+    await deleteListTidakHadirRecord(id, session);
 
     return NextResponse.json({
       ok: true,
-      message: 'Data tambahan berhasil dihapus',
+      message: 'Data peserta tidak hadir berhasil dihapus',
     });
   } catch (err) {
-    console.error('[API Data Tambahan DELETE Single Error]:', err);
+    console.error('[API List Tidak Hadir DELETE Single Error]:', err);
     return NextResponse.json(
-      { ok: false, error: err.message || 'Gagal menghapus data tambahan' },
+      { ok: false, error: err.message || 'Gagal menghapus data' },
       { status: 500 }
     );
   }

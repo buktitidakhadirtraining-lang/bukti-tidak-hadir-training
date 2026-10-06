@@ -6,7 +6,15 @@ import { X, Save, Loader2, Edit3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MASTER_TRAININGS_LIST } from '../lib/trainings-master.js';
 
-export default function EditDataTambahanModal({ isOpen, onClose, record, onUpdated, meta }) {
+export default function EditDataTambahanModal({
+  isOpen,
+  onClose,
+  record,
+  onUpdated,
+  meta,
+  title = 'Edit Data Peserta',
+  updateEndpoint,
+}) {
   const [training, setTraining] = useState('');
   const [nik, setNik] = useState('');
   const [nama, setNama] = useState('');
@@ -38,8 +46,10 @@ export default function EditDataTambahanModal({ isOpen, onClose, record, onUpdat
     setSaving(true);
     const toastId = toast.loading('Memperbarui data...');
 
+    const url = updateEndpoint || `/api/data-tambahan/${record.id}`;
+
     try {
-      const res = await fetch(`/api/data-tambahan/${record.id}`, {
+      const res = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -55,7 +65,7 @@ export default function EditDataTambahanModal({ isOpen, onClose, record, onUpdat
 
       const json = await res.json();
       if (res.ok && json.ok) {
-        toast.success('Data tambahan berhasil diperbarui!', { id: toastId });
+        toast.success('Data berhasil diperbarui!', { id: toastId });
         if (onUpdated) onUpdated();
         onClose();
       } else {
@@ -78,7 +88,7 @@ export default function EditDataTambahanModal({ isOpen, onClose, record, onUpdat
             </div>
             <div>
               <h2 className="text-base font-bold text-gray-900 font-title">
-                Edit Data Tambahan
+                {title}
               </h2>
               <p className="text-xs text-gray-500">
                 No. Urut #{record.no || '-'}
@@ -102,11 +112,11 @@ export default function EditDataTambahanModal({ isOpen, onClose, record, onUpdat
             <select
               value={training}
               onChange={(e) => setTraining(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-medium"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
             >
-              {MASTER_TRAININGS_LIST.map((tName) => (
-                <option key={tName} value={tName}>
-                  {tName}
+              {MASTER_TRAININGS_LIST.map((t) => (
+                <option key={t} value={t}>
+                  {t}
                 </option>
               ))}
             </select>
@@ -115,27 +125,26 @@ export default function EditDataTambahanModal({ isOpen, onClose, record, onUpdat
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-gray-700 mb-1">
-                NIK <span className="text-red-500">*</span>
+                NIK Peserta <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={nik}
                 onChange={(e) => setNik(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-mono font-medium"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-mono font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
               />
             </div>
-
             <div>
               <label className="block font-bold text-gray-700 mb-1">
-                Nama Peserta <span className="text-red-500">*</span>
+                Nama Lengkap <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={nama}
                 onChange={(e) => setNama(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-medium uppercase"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium uppercase focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
               />
             </div>
           </div>
@@ -147,61 +156,64 @@ export default function EditDataTambahanModal({ isOpen, onClose, record, onUpdat
                 type="text"
                 value={kdToko}
                 onChange={(e) => setKdToko(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-mono font-medium uppercase"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-mono uppercase focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
               />
             </div>
-
             <div>
               <label className="block font-bold text-gray-700 mb-1">Nama Toko</label>
               <input
                 type="text"
                 value={namaToko}
                 onChange={(e) => setNamaToko(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-medium uppercase"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs uppercase focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
               />
             </div>
           </div>
 
           <div>
             <label className="block font-bold text-gray-700 mb-1">
-              Alasan Tidak Hadir
+              Alasan Tidak Hadir <span className="text-red-500">*</span>
             </label>
-            {meta?.reasons && meta.reasons.length > 0 ? (
-              <select
-                value={alasanTidakHadir}
-                onChange={(e) => setAlasanTidakHadir(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-medium"
-              >
-                {meta.reasons.map((r) => (
+            <select
+              value={alasanTidakHadir}
+              onChange={(e) => setAlasanTidakHadir(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
+            >
+              {meta?.reasons ? (
+                meta.reasons.map((r) => (
                   <option key={r.id} value={r.name}>
                     {r.name}
                   </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={alasanTidakHadir}
-                onChange={(e) => setAlasanTidakHadir(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 font-medium"
-              />
-            )}
+                ))
+              ) : (
+                <>
+                  <option value="Sakit">Sakit</option>
+                  <option value="Cuti">Cuti</option>
+                  <option value="Mangkir">Mangkir</option>
+                  <option value="Bencana alam">Bencana alam</option>
+                  <option value="Musibah/kecelakaan">Musibah/kecelakaan</option>
+                  <option value="Menggantikan personil lain">Menggantikan personil lain</option>
+                  <option value="Keluarga inti sakit">Keluarga inti sakit</option>
+                  <option value="Lain - lain">Lain - lain</option>
+                </>
+              )}
+            </select>
           </div>
 
-          <div className="pt-4 border-t border-gray-100 flex justify-end gap-2">
+          <div className="pt-3 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-colors"
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition-colors"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2 bg-[#0056b3] hover:bg-blue-700 text-white rounded-xl font-bold transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="px-5 py-2 bg-[#0056b3] hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               <span>Simpan Perubahan</span>
             </button>
           </div>

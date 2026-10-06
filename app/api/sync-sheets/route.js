@@ -1,79 +1,66 @@
 // app/api/sync-sheets/route.js
+// Endpoint data cetak & rekap terisolasi per Cabang (100% Bebas Google Sheets)
 import { NextResponse } from 'next/server';
-import { syncSpreadsheetData } from '../../../lib/sheets.js';
+import { getSessionFromRequest } from '../../../lib/session.js';
+import {
+  resolveUserBranchId,
+  getCetakListTidakHadir,
+  getCetakRekapData,
+  getDataTambahanList,
+  getListTidakHadirList,
+} from '../../../lib/data-service.js';
 import { getSupabaseAdmin } from '../../../lib/supabase.js';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-let lastSyncTime = 0;
-let cachedSyncResult = null;
-
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const force = searchParams.get('force') === 'true';
-    const now = Date.now();
-
-    // Debounce sync minimal tiap 8-10 detik agar tidak membebani Google Sheets
-    if (force || now - lastSyncTime > 8000 || !cachedSyncResult) {
-      cachedSyncResult = await syncSpreadsheetData();
-      lastSyncTime = now;
+    const session = await getSessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = getSupabaseAdmin();
+    const { searchParams } = new URL(request.url);
+    const requestedBranchId = searchParams.get('branch_id');
 
-    // Ambil data terkini dari tabel Supabase
-    const [rekapRes, listRes, softSkillRes, tambahanRes] = await Promise.all([
-      supabase.from('cetak_rekap').select('*').order('no', { ascending: true }),
-      supabase.from('list_tidak_hadir').select('*').order('no', { ascending: true }),
-      supabase.from('list_soft_skill').select('*').order('no', { ascending: true }),
-      supabase.from('data_tambahan').select('*').order('no', { ascending: true }).limit(200),
+    const userBranchId = await resolveUserBranchId(session);
+    const branchId = session.role === 'admin_pusat' && requestedBranchId ? requestedBranchId : userBranchId;
+
+    const [combinedList, rekapData, dataTambahan, listTidakHadir] = await Promise.all([
+      getCetakListTidakHadir({ branchId, role: session.role }),
+      getCetakRekapData({ branchId, role: session.role }),
+      getDataTambahanList({ branchId, role: session.role }),
+      getListTidakHadirList({ branchId, role: session.role }),
     ]);
+
+    // Ambil list_soft_skill jika ada
+    const supabase = getSupabaseAdmin();
+    let softSkillQuery = supabase.from('list_soft_skill').select('*').order('no', { ascending: true });
+    if (session.role !== 'admin_pusat' && branchId) {
+      softSkillQuery = softSkillQuery.eq('branch_id', branchId);
+    }
+    const { data: softSkillData } = await softSkillQuery;
 
     return NextResponse.json({
       ok: true,
-      syncInfo: cachedSyncResult,
-      lastSyncTime: new Date(lastSyncTime).toISOString(),
-      rekap: rekapRes.data || [],
-      listTidakHadir: listRes.data || [],
-      softSkill: softSkillRes.data || [],
-      dataTambahan: tambahanRes.data || [],
+      syncInfo: { success: true, message: 'Data lokal cabang termuat' },
+      lastSyncTime: new Date().toISOString(),
+      rekap: rekapData || [],
+      listTidakHadir: combinedList || [], // Mengembalikan gabungan data_tambahan + list_tidak_hadir
+      rawListTidakHadir: listTidakHadir || [],
+      dataTambahan: dataTambahan || [],
+      softSkill: softSkillData || [],
     });
   } catch (err) {
-    console.error('[API Sync Sheets Error]:', err);
+    console.error('[API Sync/Cetak Data Error]:', err);
     return NextResponse.json(
-      { ok: false, error: err.message || 'Gagal sinkronisasi Google Sheets' },
+      { ok: false, error: err.message || 'Gagal memuat data cetak' },
       { status: 500 }
     );
   }
 }
 
-export async function POST() {
-  try {
-    const result = await syncSpreadsheetData();
-    lastSyncTime = Date.now();
-    cachedSyncResult = result;
-
-    const supabase = getSupabaseAdmin();
-    const [rekapRes, listRes, softSkillRes] = await Promise.all([
-      supabase.from('cetak_rekap').select('*').order('no', { ascending: true }),
-      supabase.from('list_tidak_hadir').select('*').order('no', { ascending: true }),
-      supabase.from('list_soft_skill').select('*').order('no', { ascending: true }),
-    ]);
-
-    return NextResponse.json({
-      ok: true,
-      syncInfo: result,
-      rekap: rekapRes.data || [],
-      listTidakHadir: listRes.data || [],
-      softSkill: softSkillRes.data || [],
-    });
-  } catch (err) {
-    console.error('[API Sync Sheets POST Error]:', err);
-    return NextResponse.json(
-      { ok: false, error: err.message || 'Gagal sinkronisasi Google Sheets' },
-      { status: 500 }
-    );
-  }
+export async function POST(request) {
+  return GET(request);
 }

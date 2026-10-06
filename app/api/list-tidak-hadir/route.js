@@ -1,11 +1,11 @@
-// app/api/data-tambahan/route.js
+// app/api/list-tidak-hadir/route.js
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '../../../lib/session.js';
 import {
   resolveUserBranchId,
-  getDataTambahanList,
-  insertDataTambahanRecord,
-  clearAllDataTambahan,
+  getListTidakHadirList,
+  insertListTidakHadirRecord,
+  clearAllListTidakHadir,
 } from '../../../lib/data-service.js';
 
 export const dynamic = 'force-dynamic';
@@ -24,11 +24,11 @@ export async function GET(request) {
     const userBranchId = await resolveUserBranchId(session);
     const branchId = session.role === 'admin_pusat' && requestedBranchId ? requestedBranchId : userBranchId;
 
-    const data = await getDataTambahanList({ branchId, role: session.role });
+    const data = await getListTidakHadirList({ branchId, role: session.role });
 
     return NextResponse.json({ ok: true, data });
   } catch (err) {
-    console.error('[API Data Tambahan GET Error]:', err);
+    console.error('[API List Tidak Hadir GET Error]:', err);
     return NextResponse.json(
       { ok: false, error: err.message || 'Terjadi kesalahan sistem' },
       { status: 500 }
@@ -56,7 +56,7 @@ export async function POST(request) {
       );
     }
 
-    const saved = await insertDataTambahanRecord(
+    const saved = await insertListTidakHadirRecord(
       {
         training: training || 'TRAINING',
         nik,
@@ -70,21 +70,18 @@ export async function POST(request) {
 
     return NextResponse.json({
       ok: true,
-      message: 'Data tambahan berhasil disimpan ke database cabang Anda.',
+      message: 'Data peserta tidak hadir berhasil disimpan ke database cabang Anda.',
       data: saved,
     });
   } catch (err) {
-    console.error('[API Data Tambahan POST Error]:', err);
+    console.error('[API List Tidak Hadir POST Error]:', err);
     return NextResponse.json(
-      { ok: false, error: err.message || 'Gagal menyimpan data tambahan' },
+      { ok: false, error: err.message || 'Gagal menyimpan data peserta tidak hadir' },
       { status: 500 }
     );
   }
 }
 
-/**
- * DELETE: Hapus SEMUA data tambahan untuk cabang aktif
- */
 export async function DELETE(request) {
   try {
     const session = await getSessionFromRequest(request);
@@ -95,16 +92,16 @@ export async function DELETE(request) {
       );
     }
 
-    await clearAllDataTambahan(session);
+    await clearAllListTidakHadir(session);
 
     return NextResponse.json({
       ok: true,
-      message: 'Semua data tambahan di cabang Anda berhasil dibersihkan',
+      message: 'Semua data peserta tidak hadir di cabang Anda berhasil dibersihkan',
     });
   } catch (err) {
-    console.error('[API Data Tambahan DELETE All Error]:', err);
+    console.error('[API List Tidak Hadir DELETE All Error]:', err);
     return NextResponse.json(
-      { ok: false, error: err.message || 'Gagal membersihkan data tambahan' },
+      { ok: false, error: err.message || 'Gagal membersihkan data' },
       { status: 500 }
     );
   }

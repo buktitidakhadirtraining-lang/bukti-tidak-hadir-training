@@ -1,9 +1,9 @@
-// app/(app)/input-tambahan/page.js
+// app/(app)/list-tidak-hadir/page.js
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  UserPlus,
+  ClipboardList,
   Save,
   Loader2,
   RefreshCw,
@@ -22,7 +22,7 @@ import EditDataTambahanModal from '../../../components/EditDataTambahanModal.js'
 import ImportExportModal from '../../../components/ImportExportModal.js';
 import ConfirmDialog from '../../../components/ConfirmDialog.js';
 
-export default function InputTambahanPage() {
+export default function ListTidakHadirPage() {
   const [training, setTraining] = useState('YFC');
   const [nik, setNik] = useState('');
   const [nama, setNama] = useState('');
@@ -69,11 +69,11 @@ export default function InputTambahanPage() {
     loadMetaAndUser();
   }, []);
 
-  // Ambil data tambahan cabang yang sedang login
+  // Ambil data list tidak hadir cabang yang sedang login
   const fetchRecords = useCallback(async () => {
     setLoadingList(true);
     try {
-      const res = await fetch('/api/data-tambahan');
+      const res = await fetch('/api/list-tidak-hadir');
       const json = await res.json();
       if (json.ok) {
         setRecords(json.data || []);
@@ -81,7 +81,7 @@ export default function InputTambahanPage() {
         toast.error(json.error || 'Gagal memuat data');
       }
     } catch (err) {
-      console.error('Failed to fetch data tambahan:', err);
+      console.error('Failed to fetch list tidak hadir:', err);
     } finally {
       setLoadingList(false);
     }
@@ -99,10 +99,10 @@ export default function InputTambahanPage() {
     }
 
     setSaving(true);
-    const toastId = toast.loading('Menyimpan data ke database cabang...');
+    const toastId = toast.loading('Menyimpan data peserta ke database cabang...');
 
     try {
-      const res = await fetch('/api/data-tambahan', {
+      const res = await fetch('/api/list-tidak-hadir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,7 +118,7 @@ export default function InputTambahanPage() {
       const json = await res.json();
       if (res.ok && json.ok) {
         toast.success(
-          'Data berhasil disimpan di database cabang dan otomatis masuk ke Lembar Cetak Bukti PDF!',
+          'Data peserta berhasil disimpan dan otomatis masuk ke Lembar Cetak Bukti PDF!',
           { id: toastId }
         );
         // Reset form input
@@ -143,12 +143,12 @@ export default function InputTambahanPage() {
     setDeleteSingleDialog((prev) => ({ ...prev, loading: true }));
 
     try {
-      const res = await fetch(`/api/data-tambahan/${deleteSingleDialog.record.id}`, {
+      const res = await fetch(`/api/list-tidak-hadir/${deleteSingleDialog.record.id}`, {
         method: 'DELETE',
       });
       const json = await res.json();
       if (res.ok && json.ok) {
-        toast.success('Data berhasil dihapus');
+        toast.success('Data peserta berhasil dihapus');
         setDeleteSingleDialog({ isOpen: false, record: null, loading: false });
         fetchRecords();
       } else {
@@ -166,12 +166,12 @@ export default function InputTambahanPage() {
     setDeleteAllDialog((prev) => ({ ...prev, loading: true }));
 
     try {
-      const res = await fetch('/api/data-tambahan', {
+      const res = await fetch('/api/list-tidak-hadir', {
         method: 'DELETE',
       });
       const json = await res.json();
       if (res.ok && json.ok) {
-        toast.success('Semua data tambahan di cabang Anda berhasil dibersihkan');
+        toast.success('Semua data peserta tidak hadir di cabang Anda berhasil dibersihkan');
         setDeleteAllDialog({ isOpen: false, loading: false });
         fetchRecords();
       } else {
@@ -204,12 +204,12 @@ export default function InputTambahanPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-50 text-[#0056b3] rounded-xl">
-              <UserPlus className="w-6 h-6" />
+              <ClipboardList className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-black text-gray-900 font-title">
-                  Input Data Tambahan
+                  List Tidak Hadir Training
                 </h1>
                 {currentUser?.branch_name && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-[#0056b3]">
@@ -219,7 +219,7 @@ export default function InputTambahanPage() {
                 )}
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                Pencatatan data peserta tambahan khusus cabang Anda. Data tersimpan aman di database cabang dan otomatis terintegrasi ke menu Cetak Bukti PDF.
+                Penginputan dan pengelolaan daftar peserta tidak hadir khusus cabang Anda. Data tersimpan aman dan terisolasi dari cabang lain.
               </p>
             </div>
           </div>
@@ -237,7 +237,7 @@ export default function InputTambahanPage() {
         </div>
       </div>
 
-      {/* Form Input Data Tambahan */}
+      {/* Form Input Peserta Tidak Hadir */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-soft overflow-hidden">
         {/* Tricolor Bar */}
         <div className="indomaret-bar">
@@ -358,7 +358,7 @@ export default function InputTambahanPage() {
 
           <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
             <p className="text-[11px] text-gray-500 italic">
-              * Data yang Anda input langsung tersimpan aman di database cabang Anda.
+              * Data tersimpan aman di database cabang Anda dan terisolasi dari cabang lain.
             </p>
             <button
               type="submit"
@@ -373,7 +373,7 @@ export default function InputTambahanPage() {
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  <span>Simpan Data Tambahan</span>
+                  <span>Simpan Peserta Tidak Hadir</span>
                 </>
               )}
             </button>
@@ -381,13 +381,13 @@ export default function InputTambahanPage() {
         </form>
       </div>
 
-      {/* Tabel Data Tambahan Terkini */}
+      {/* Tabel Data List Tidak Hadir */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-soft space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <TableProperties className="w-5 h-5 text-gray-600" />
             <h2 className="text-base font-bold text-gray-900 font-title">
-              Daftar Data Tambahan Tersimpan ({filteredRecords.length} Data)
+              Daftar List Tidak Hadir Tersimpan ({filteredRecords.length} Data)
             </h2>
           </div>
 
@@ -419,7 +419,7 @@ export default function InputTambahanPage() {
                 type="button"
                 onClick={() => setDeleteAllDialog({ isOpen: true, loading: false })}
                 className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-bold border border-red-200 transition-colors"
-                title="Hapus seluruh data tambahan cabang ini"
+                title="Hapus seluruh data peserta tidak hadir di cabang ini"
               >
                 <Trash className="w-3.5 h-3.5" />
                 <span>Hapus Semua</span>
@@ -480,7 +480,7 @@ export default function InputTambahanPage() {
               ) : (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-gray-400 italic">
-                    {loadingList ? 'Memuat data...' : 'Belum ada data tambahan yang tercatat di cabang Anda.'}
+                    {loadingList ? 'Memuat data...' : 'Belum ada data peserta tidak hadir yang tercatat di cabang Anda.'}
                   </td>
                 </tr>
               )}
@@ -489,13 +489,13 @@ export default function InputTambahanPage() {
         </div>
       </div>
 
-      {/* Modal Edit Data Tambahan */}
+      {/* Modal Edit Data */}
       <EditDataTambahanModal
         isOpen={Boolean(editingRecord)}
         record={editingRecord}
         meta={meta}
-        title="Edit Data Tambahan"
-        updateEndpoint={editingRecord ? `/api/data-tambahan/${editingRecord.id}` : null}
+        title="Edit List Tidak Hadir Training"
+        updateEndpoint={editingRecord ? `/api/list-tidak-hadir/${editingRecord.id}` : null}
         onClose={() => setEditingRecord(null)}
         onUpdated={fetchRecords}
       />
@@ -504,10 +504,10 @@ export default function InputTambahanPage() {
       <ImportExportModal
         isOpen={showImportExportModal}
         onClose={() => setShowImportExportModal(false)}
-        title="Impor / Ekspor Data Tambahan"
-        targetName="Data Tambahan"
-        importEndpoint="/api/data-tambahan/import"
-        exportEndpoint="/api/data-tambahan/export"
+        title="Impor / Ekspor List Tidak Hadir Training"
+        targetName="List Tidak Hadir"
+        importEndpoint="/api/list-tidak-hadir/import"
+        exportEndpoint="/api/list-tidak-hadir/export"
         currentRecords={records}
         onSuccess={fetchRecords}
       />
@@ -515,7 +515,7 @@ export default function InputTambahanPage() {
       {/* Dialog Konfirmasi Hapus 1 Baris */}
       <ConfirmDialog
         isOpen={deleteSingleDialog.isOpen}
-        title="Hapus Data Tambahan"
+        title="Hapus Data Peserta Tidak Hadir"
         message={`Apakah Anda yakin ingin menghapus data peserta "${deleteSingleDialog.record?.nama}" (NIK: ${deleteSingleDialog.record?.nik})?`}
         confirmText="Hapus Data"
         cancelText="Batal"
@@ -528,8 +528,8 @@ export default function InputTambahanPage() {
       {/* Dialog Konfirmasi Hapus SEMUA Baris */}
       <ConfirmDialog
         isOpen={deleteAllDialog.isOpen}
-        title="Hapus Semua Data Tambahan"
-        message={`PERINGATAN: Tindakan ini akan menghapus seluruh (${records.length}) data tambahan cabang Anda. Apakah Anda yakin?`}
+        title="Hapus Semua Data Peserta Tidak Hadir"
+        message={`PERINGATAN: Tindakan ini akan menghapus seluruh (${records.length}) data peserta tidak hadir di cabang Anda. Apakah Anda yakin?`}
         confirmText="Hapus Semua Data"
         cancelText="Batal"
         isDanger={true}
