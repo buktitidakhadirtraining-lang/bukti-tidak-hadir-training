@@ -224,7 +224,7 @@ export default function CetakPage() {
     window.print();
   }
 
-  // Fungsi mengunduh berkas fisik PDF langsung ke komputer
+  // Fungsi mengunduh berkas fisik PDF langsung ke komputer (Satu .sheet = Satu Halaman PDF)
   async function handleDownloadPdf() {
     if (downloadingPdf) return;
 
@@ -232,65 +232,69 @@ export default function CetakPage() {
     const toastId = toast.loading('Sedang memproses dan membuat berkas PDF...');
 
     try {
-      const html2pdfModule = await import('html2pdf.js');
-      const html2pdf = html2pdfModule.default || html2pdfModule;
-
-      const element = document.getElementById('printable-content');
-      if (!element) {
-        throw new Error('Elemen konten dokumen cetak tidak ditemukan');
+      // Tunggu font dan gambar selesai dimuat sepenuhnya
+      if (typeof document !== 'undefined' && document.fonts) {
+        await document.fonts.ready;
       }
 
-      // Tentukan nama berkas dan orientasi sesuai format yang aktif
-      let filename = 'Dokumen_Ketidakhadiran_Training.pdf';
-      let orientation = 'portrait';
+      const { jsPDF } = await import('jspdf');
+      const html2canvas = (await import('html2canvas')).default;
 
+      const sheets = document.querySelectorAll('.sheet');
+      if (!sheets || sheets.length === 0) {
+        throw new Error('Elemen lembar dokumen (.sheet) tidak ditemukan');
+      }
+
+      const isLandscape = printFormat === 'horizontal' || printFormat === 'lama';
+      const orientation = isLandscape ? 'landscape' : 'portrait';
+      const pdfWidth = isLandscape ? 297 : 210;
+      const pdfHeight = isLandscape ? 210 : 297;
+      const windowWidthPx = isLandscape ? 1123 : 794;
+
+      const pdf = new jsPDF({
+        unit: 'mm',
+        format: 'a4',
+        orientation: orientation,
+        compress: true,
+      });
+
+      for (let i = 0; i < sheets.length; i++) {
+        const sheet = sheets[i];
+
+        const canvas = await html2canvas(sheet, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          windowWidth: windowWidthPx,
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+        if (i > 0) {
+          pdf.addPage('a4', orientation);
+        }
+
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      }
+
+      // Tentukan nama berkas sesuai format yang aktif
+      let filename = 'Dokumen_Ketidakhadiran_Training.pdf';
       if (printFormat === 'rekap_dispensasi') {
         filename = `Berita_Acara_Rekapitulasi_Training_${bulanCetak}_${tahunCetak}_${ttdMode}.pdf`;
-        orientation = 'portrait';
       } else if (printFormat === 'soft_skill') {
         filename = `Berita_Acara_Soft_Skill_${softSkillPeriode.replace(/[^a-zA-Z0-9]/g, '_')}_${softSkillTtdMode}.pdf`;
-        orientation = 'portrait';
       } else if (printFormat === 'list_tidak_hadir') {
         const trTag = selectedTrainingListFilter ? `_${selectedTrainingListFilter.replace(/[^a-zA-Z0-9]/g, '_')}` : '_Semua_Training';
         filename = `Lampiran_Detail_Peserta_Tidak_Hadir${trTag}.pdf`;
-        orientation = 'portrait';
       } else if (printFormat === 'horizontal') {
         filename = `Lampiran_Bukti_Foto_Horizontal_${year}.pdf`;
-        orientation = 'landscape';
       } else {
         filename = `Berita_Acara_Lama_${year}.pdf`;
-        orientation = 'landscape';
       }
 
-      const opt = {
-        margin: printFormat === 'list_tidak_hadir' ? [0, 0, 0, 0] : [4, 4, 4, 4],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          letterRendering: true,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          scrollY: 0,
-          scrollX: 0,
-          windowWidth: orientation === 'portrait' ? 794 : 1150,
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: orientation,
-          compress: true,
-        },
-        pagebreak: {
-          mode: ['css', 'legacy'],
-          after: ['.sheet', '.html2pdf__page-break', '.print-page-break'],
-          avoid: ['tr', 'thead', '.print-break-avoid'],
-        },
-      };
-
-      await html2pdf().set(opt).from(element).save();
+      pdf.save(filename);
       toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });
     } catch (err) {
       console.error('[Download PDF Error]:', err);
@@ -904,8 +908,8 @@ export default function CetakPage() {
               return (
                 <div
                   key={group.id}
-                  className={`bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-md max-w-6xl mx-auto print:p-0 print:border-0 print:shadow-none ${
-                    groupIdx > 0 ? 'print-page-break' : ''
+                  className={`sheet landscape ${
+                    groupIdx === trainingGroups.length - 1 ? 'last-sheet' : ''
                   }`}
                 >
                   <div className="overflow-x-auto">
@@ -1025,10 +1029,11 @@ export default function CetakPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 4. FORMAT: GRID VERTIKAL LAMA                                             */}
+      {/* 5. FORMAT: GRID VERTIKAL LAMA                                             */}
       {/* ========================================================================= */}
       {printFormat === 'lama' && (
-        <div id="printable-content" className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-200 shadow-md max-w-5xl mx-auto print:p-0 print:border-0 print:shadow-none">
+        <div id="printable-content" className="max-w-6xl mx-auto">
+          <div className="sheet landscape last-sheet">
           <div className="flex items-start justify-between border-b-2 border-gray-800 pb-4">
             <div className="flex items-center gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1133,6 +1138,7 @@ export default function CetakPage() {
               </div>
             </div>
           </div>
+        </div>
         </div>
       )}
 

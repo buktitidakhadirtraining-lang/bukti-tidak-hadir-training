@@ -18,7 +18,7 @@ export default function BeritaAcaraSoftSkill({
 }) {
   return (
     <div
-      className="bg-white text-black p-6 sm:p-10 max-w-4xl mx-auto shadow-sm print:p-0 print:shadow-none print:max-w-none text-xs leading-relaxed pdf-page-container"
+      className="sheet text-xs leading-relaxed"
       style={{ fontFamily: "'Times New Roman', Times, serif" }}
     >
       {/* 1. Header Judul Berita Acara Soft Skill (Sesuai Gambar 7) */}

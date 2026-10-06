@@ -124,7 +124,6 @@ export default function LampiranListTidakHadir({
           <div
             key={sheet.sheetId}
             className={`sheet ${isLastSheet ? 'last-sheet' : ''}`}
-            style={{ boxSizing: 'border-box' }}
           >
             {/* Header Lembar A4 (Sesuai Aturan 1: Dalam alur normal dokumen) */}
             <div className="sheet-header text-center mb-3">

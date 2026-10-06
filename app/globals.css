@@ -40,32 +40,40 @@ h1, h2, h3, h4, h5, h6 {
 /* STYLING LEMBAR A4 (.sheet) UNTUK TAMPILAN PREVIEW & CETAK / PDF            */
 /* ========================================================================== */
 
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
 .sheet {
-  width: 210mm;
-  min-height: 297mm;
-  height: 297mm;
-  padding: 12mm;
-  box-sizing: border-box;
-  background-color: #ffffff;
+  box-sizing: border-box !important;
+  width: 210mm !important;
+  height: 296mm !important;
+  min-height: 296mm !important;
+  max-height: 296mm !important;
+  padding: 12mm !important;
+  overflow: hidden !important;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
   margin: 0 auto 16mm auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   border: 1px solid #e2e8f0;
   border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  page-break-after: always;
+}
+
+.sheet:not(:last-child) {
   break-after: page;
-  page-break-inside: avoid;
-  break-inside: avoid;
-  color: #000000;
+  page-break-after: always;
 }
 
 .sheet:last-child,
 .sheet.last-sheet {
-  margin-bottom: 0;
-  page-break-after: auto;
-  break-after: auto;
+  margin-bottom: 0 !important;
+  break-after: auto !important;
+  page-break-after: auto !important;
 }
 
 .sheet-table {
@@ -81,11 +89,6 @@ h1, h2, h3, h4, h5, h6 {
 .sheet-table tr {
   page-break-inside: avoid !important;
   break-inside: avoid !important;
-}
-
-@page {
-  size: A4 portrait;
-  margin: 0;
 }
 
 @media print {
@@ -113,22 +116,24 @@ h1, h2, h3, h4, h5, h6 {
     border: none !important;
     border-radius: 0 !important;
     width: 210mm !important;
-    height: 297mm !important;
-    min-height: 297mm !important;
-    max-height: 297mm !important;
+    height: 296mm !important;
+    min-height: 296mm !important;
+    max-height: 296mm !important;
     padding: 12mm !important;
     box-sizing: border-box !important;
-    page-break-after: always !important;
-    break-after: page !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+    overflow: hidden !important;
     background: #ffffff !important;
+  }
+
+  .sheet:not(:last-child) {
+    break-after: page !important;
+    page-break-after: always !important;
   }
 
   .sheet:last-child,
   .sheet.last-sheet {
-    page-break-after: auto !important;
     break-after: auto !important;
+    page-break-after: auto !important;
   }
 }
 
