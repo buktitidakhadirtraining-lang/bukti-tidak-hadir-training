@@ -9,8 +9,7 @@ import { SPREADSHEET_URL } from '../lib/config.js';
 const SQL_SCRIPT = `-- ==============================================================================
 -- SCHEMA SQL: TABEL GOOGLE SPREADSHEET SYNC & CETAK REKAP DISPENSASI
 -- ==============================================================================
--- Link Spreadsheet:
--- https://docs.google.com/spreadsheets/d/1X9rBiIzAo-PHIAPAFcAU3ElpHBSVDga_BftgSeqWdqY/edit?gid=1583921750#gid=1583921750
+-- Mendukung multi-cabang (Tiap cabang memiliki file Spreadsheet & Web App sendiri)
 
 -- 1. TABEL: cetak_rekap (Sesuai Sheet cetak_rekap)
 -- Header: NO, JENIS TRAINING, TARGET LSKT, DISPENSASI, TARGET TC REPORT, HADIR, TIDAK HADIR, NO LIST PESERTA TIDAK HADIR

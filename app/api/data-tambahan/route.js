@@ -71,3 +71,73 @@ export async function POST(request) {
     );
   }
 }
+
+/**
+ * DELETE: Hapus SEMUA data tambahan
+ */
+export async function DELETE(request) {
+  try {
+    const session = await getSessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: 'Sesi login tidak valid' },
+        { status: 401 }
+      );
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('data_tambahan')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    // Panggil webhook clear spreadsheet jika terhubung
+    try {
+      let bridgeUrl = null;
+      try {
+        const { data: settings } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'spreadsheet_bridge_url')
+          .limit(1);
+        if (settings && settings[0]?.value) bridgeUrl = settings[0].value.trim();
+      } catch {}
+
+      if (!bridgeUrl) {
+        const { data: branches } = await supabase
+          .from('branches')
+          .select('drive_bridge_url')
+          .not('drive_bridge_url', 'is', null)
+          .limit(1);
+        if (branches && branches[0]?.drive_bridge_url) bridgeUrl = branches[0].drive_bridge_url.trim();
+      }
+
+      if (bridgeUrl && bridgeUrl.startsWith('http')) {
+        await fetch(bridgeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'clear_data_tambahan',
+            sheet: 'Data_tambahan',
+          }),
+        }).catch(() => {});
+      }
+    } catch {}
+
+    return NextResponse.json({
+      ok: true,
+      message: 'Semua data tambahan berhasil dihapus',
+    });
+  } catch (err) {
+    console.error('[API Data Tambahan DELETE All Error]:', err);
+    return NextResponse.json(
+      { ok: false, error: err.message || 'Gagal menghapus data' },
+      { status: 500 }
+    );
+  }
+}
+

@@ -13,30 +13,30 @@ import {
   Play,
   Loader2,
   HelpCircle,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SPREADSHEET_ID, SPREADSHEET_URL } from '../lib/config.js';
 
 export const APPS_SCRIPT_CODE = `/**
  * GOOGLE APPS SCRIPT WEBHOOK BRIDGE (Code.gs)
- * Untuk Google Spreadsheet Rekap & Data Tambahan
- * Link Spreadsheet: https://docs.google.com/spreadsheets/d/1X9rBiIzAo-PHIAPAFcAU3ElpHBSVDga_BftgSeqWdqY
+ * Untuk Google Spreadsheet Cabang (Sheet: Data_tambahan)
+ * 
+ * Skrip ini dipasang oleh ADMIN CABANG pada file Google Spreadsheet cabangnya masing-masing.
  *
- * CARA MEMASANG:
- * 1. Buka Google Spreadsheet di atas.
- * 2. Klik menu: Ekstensi (Extensions) > Apps Script.
- * 3. Hapus semua tulisan di editor, lalu PASTE (TEMPEL) seluruh kode ini.
- * 4. Klik ikon Simpan (ikon Disket).
+ * CARA MEMASANG OLEH ADMIN CABANG:
+ * 1. Buka file Google Spreadsheet cabang Anda.
+ * 2. Klik menu di atas: Ekstensi (Extensions) > Apps Script.
+ * 3. Hapus semua tulisan di editor Apps Script, lalu PASTE (TEMPEL) seluruh kode ini.
+ * 4. Klik tombol Simpan (ikon Disket).
  * 5. Klik tombol biru: Terapkan (Deploy) > Penerapan baru (New deployment).
- * 6. Klik ikon Gerigi (Setelan) di kiri atas popup > Pilih "Aplikasi Web" (Web app).
- * 7. Konfigurasi:
- *    - Deskripsi: Webhook Data Tambahan Indomaret
- *    - Jalankan sebagai (Execute as): Saya (Me)
- *    - Siapa yang memiliki akses (Who has access): Siapa saja (Anyone)  <-- WAJIB PILIH ANYONE
- * 8. Klik tombol "Terapkan" (Deploy).
- * 9. Berikan izin otorisasi Google jika diminta.
- * 10. Salin URL Aplikasi Web (berakhiran /exec) dan tempel di formulir pengaturan sistem.
+ * 6. Klik ikon Gerigi (Setelan) di samping kiri atas popup > Pilih "Aplikasi Web" (Web app).
+ * 7. Atur Konfigurasi:
+ *    - Deskripsi: Webhook Data Tambahan Cabang
+ *    - Jalankan sebagai (Execute as): Saya (Me / Akun Google Anda)
+ *    - Siapa yang memiliki akses (Who has access): Siapa saja (Anyone)  <-- WAJIB PILIH "ANYONE"
+ * 8. Klik tombol "Terapkan" (Deploy) lalu berikan izin otorisasi jika diminta Google.
+ * 9. Salin URL Aplikasi Web yang berakhiran "/exec".
+ * 10. Masukkan URL tersebut ke menu Pengaturan Apps Script / Pengaturan Cabang di web.
  */
 
 var SHEET_DATA_TAMBAHAN_NAME = 'Data_tambahan';
@@ -56,12 +56,27 @@ function doPost(e) {
 
     var action = payload.action;
 
-    // Aksi 1: PENCATATAN OTOMATIS DATA TAMBAHAN KE SPREADSHEET
+    // Aksi 1: PENCATATAN DATA TAMBAHAN BARU
     if (action === 'append_data_tambahan') {
       return handleAppendDataTambahan(payload);
     }
 
-    // Aksi 2: TES KONEKSI (PING)
+    // Aksi 2: UPDATE BARIS DATA TAMBAHAN (EDIT)
+    if (action === 'update_data_tambahan') {
+      return handleUpdateDataTambahan(payload);
+    }
+
+    // Aksi 3: HAPUS 1 BARIS DATA TAMBAHAN
+    if (action === 'delete_data_tambahan') {
+      return handleDeleteDataTambahan(payload);
+    }
+
+    // Aksi 4: BERSIHKAN SELURUH DATA TAMBAHAN (HAPUS SEMUA)
+    if (action === 'clear_data_tambahan') {
+      return handleClearDataTambahan(payload);
+    }
+
+    // Aksi 5: TES KONEKSI (PING)
     if (action === 'ping') {
       return jsonResponse({
         ok: true,
@@ -80,88 +95,157 @@ function doPost(e) {
   }
 }
 
-function handleAppendDataTambahan(payload) {
-  try {
-    var ss;
-    if (payload.spreadsheetId) {
-      try {
-        ss = SpreadsheetApp.openById(payload.spreadsheetId);
-      } catch (openErr) {
-        ss = SpreadsheetApp.getActiveSpreadsheet();
-      }
-    } else {
+function getTargetSheet(payload) {
+  var ss;
+  if (payload && payload.spreadsheetId) {
+    try {
+      ss = SpreadsheetApp.openById(payload.spreadsheetId);
+    } catch (openErr) {
       ss = SpreadsheetApp.getActiveSpreadsheet();
     }
+  } else {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+  }
 
-    if (!ss) {
-      return jsonResponse({
-        ok: false,
-        error: 'Spreadsheet tidak ditemukan'
-      });
-    }
+  if (!ss) return null;
 
-    var sheetName = payload.sheet || SHEET_DATA_TAMBAHAN_NAME;
-    var sheet = ss.getSheetByName(sheetName);
+  var sheetName = (payload && payload.sheet) || SHEET_DATA_TAMBAHAN_NAME;
+  var sheet = ss.getSheetByName(sheetName);
 
-    // Jika sheet Data_tambahan belum ada, buatkan otomatis beserta headernya
-    if (!sheet) {
-      sheet = ss.insertSheet(sheetName);
-      sheet.appendRow([
-        'NO',
-        'TRAINING',
-        'NIK',
-        'NAMA',
-        'KD TOKO',
-        'NAMA TOKO',
-        'ALASAN TIDAK HADIR'
-      ]);
-      
-      var headerRange = sheet.getRange(1, 1, 1, 7);
-      headerRange.setFontWeight('bold');
-      headerRange.setBackground('#2E7D32');
-      headerRange.setFontColor('#FFFFFF');
-    }
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow([
+      'NO',
+      'TRAINING',
+      'NIK',
+      'NAMA',
+      'KD TOKO',
+      'NAMA TOKO',
+      'ALASAN TIDAK HADIR'
+    ]);
+    var headerRange = sheet.getRange(1, 1, 1, 7);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#2E7D32');
+    headerRange.setFontColor('#FFFFFF');
+  }
+
+  return sheet;
+}
+
+function handleAppendDataTambahan(payload) {
+  try {
+    var sheet = getTargetSheet(payload);
+    if (!sheet) return jsonResponse({ ok: false, error: 'Spreadsheet tidak ditemukan' });
 
     var rowData = payload.row;
     if (!rowData || !Array.isArray(rowData)) {
-      return jsonResponse({
-        ok: false,
-        error: 'Data baris (row) kosong atau bukan array'
-      });
+      return jsonResponse({ ok: false, error: 'Data baris kosong atau bukan array' });
     }
 
-    // Nomor urut otomatis
     var lastRow = sheet.getLastRow();
     if (!rowData[0] || rowData[0] === 0) {
       rowData[0] = lastRow > 1 ? lastRow : 1;
     }
 
-    // Format data agar NIK dan KD Toko tetap terbaca string utuh
     var formattedRow = [
       rowData[0],
       String(rowData[1] || ''),
-      "'" + String(rowData[2] || ''), // Tanda petik agar angka 0 di depan NIK tidak hilang
+      "'" + String(rowData[2] || ''),
       String(rowData[3] || ''),
       String(rowData[4] || ''),
       String(rowData[5] || ''),
       String(rowData[6] || '')
     ];
 
-    // Sisipkan baris baru ke paling bawah
     sheet.appendRow(formattedRow);
 
     return jsonResponse({
       ok: true,
-      message: 'Data tambahan berhasil dicatat ke sheet ' + sheetName,
+      message: 'Data tambahan berhasil dicatat ke Spreadsheet',
       rowNumber: sheet.getLastRow(),
       insertedData: formattedRow
     });
-
   } catch (sheetErr) {
-    return jsonResponse({
-      ok: false,
-      error: 'Gagal menulis ke Spreadsheet: ' + sheetErr.toString()
-    });
+    return jsonResponse({ ok: false, error: 'Gagal menulis ke Spreadsheet: ' + sheetErr.toString() });
+  }
+}
+
+function handleUpdateDataTambahan(payload) {
+  try {
+    var sheet = getTargetSheet(payload);
+    if (!sheet) return jsonResponse({ ok: false, error: 'Spreadsheet tidak ditemukan' });
+
+    var targetNik = String(payload.nik || '').trim();
+    var rowData = payload.row;
+    if (!targetNik || !rowData) {
+      return jsonResponse({ ok: false, error: 'NIK atau rowData kosong' });
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var targetRowIndex = -1;
+    for (var i = 1; i < data.length; i++) {
+      var cellNik = String(data[i][2] || '').trim();
+      if (cellNik === targetNik) {
+        targetRowIndex = i + 1; // 1-indexed
+        break;
+      }
+    }
+
+    if (targetRowIndex !== -1) {
+      sheet.getRange(targetRowIndex, 1, 1, 7).setValues([[
+        rowData[0] || (targetRowIndex - 1),
+        String(rowData[1] || ''),
+        "'" + String(rowData[2] || ''),
+        String(rowData[3] || ''),
+        String(rowData[4] || ''),
+        String(rowData[5] || ''),
+        String(rowData[6] || '')
+      ]]);
+      return jsonResponse({ ok: true, message: 'Baris NIK ' + targetNik + ' berhasil diupdate' });
+    } else {
+      // Jika belum ada, append baru
+      return handleAppendDataTambahan(payload);
+    }
+  } catch (err) {
+    return jsonResponse({ ok: false, error: 'Gagal update: ' + err.toString() });
+  }
+}
+
+function handleDeleteDataTambahan(payload) {
+  try {
+    var sheet = getTargetSheet(payload);
+    if (!sheet) return jsonResponse({ ok: false, error: 'Spreadsheet tidak ditemukan' });
+
+    var targetNik = String(payload.nik || '').trim();
+    if (!targetNik) return jsonResponse({ ok: false, error: 'NIK kosong' });
+
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var cellNik = String(data[i][2] || '').trim();
+      if (cellNik === targetNik) {
+        sheet.deleteRow(i + 1);
+        return jsonResponse({ ok: true, message: 'Baris NIK ' + targetNik + ' berhasil dihapus' });
+      }
+    }
+
+    return jsonResponse({ ok: true, message: 'Baris tidak ditemukan di Spreadsheet' });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: 'Gagal menghapus: ' + err.toString() });
+  }
+}
+
+function handleClearDataTambahan(payload) {
+  try {
+    var sheet = getTargetSheet(payload);
+    if (!sheet) return jsonResponse({ ok: false, error: 'Spreadsheet tidak ditemukan' });
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.deleteRows(2, lastRow - 1);
+    }
+    return jsonResponse({ ok: true, message: 'Seluruh data di sheet Data_tambahan berhasil dibersihkan' });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: 'Gagal membersihkan: ' + err.toString() });
   }
 }
 
@@ -170,7 +254,7 @@ function doGet(e) {
     JSON.stringify({
       status: 'active',
       service: 'Google Apps Script Webhook Bridge - Data Tambahan Indomaret',
-      version: '2.0.0',
+      version: '2.5.0',
       timestamp: new Date().toISOString()
     })
   ).setMimeType(ContentService.MimeType.JSON);
@@ -187,7 +271,6 @@ export default function AppsScriptModal({ isOpen, onClose }) {
   const [copied, setCopied] = useState(false);
   const [bridgeUrl, setBridgeUrl] = useState('');
   const [savingUrl, setSavingUrl] = useState(false);
-  const [testingUrl, setTestingUrl] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
   // Ambil URL yang saat ini tersimpan
@@ -265,10 +348,10 @@ export default function AppsScriptModal({ isOpen, onClose }) {
             </div>
             <div>
               <h2 className="text-base font-bold text-gray-900 font-title">
-                Panduan & Kode Google Apps Script (Code.gs)
+                Pengaturan Google Apps Script Webhook (Code.gs)
               </h2>
               <p className="text-xs text-gray-500">
-                Agar input data tambahan otomatis masuk ke Google Spreadsheet sheet Data_tambahan
+                Hubungkan website langsung ke Google Spreadsheet sheet Data_tambahan
               </p>
             </div>
           </div>
@@ -283,45 +366,11 @@ export default function AppsScriptModal({ isOpen, onClose }) {
 
         {/* Isi Modal */}
         <div className="p-5 overflow-y-auto space-y-5 text-xs">
-          {/* Langkah 1, 2, 3 */}
-          <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-4 text-blue-900 space-y-2">
-            <h3 className="font-bold flex items-center gap-2 text-sm text-[#0056b3]">
-              <HelpCircle className="w-4 h-4" />
-              Langkah Singkat Memasang di Spreadsheet:
-            </h3>
-            <ol className="list-decimal pl-5 space-y-1.5 text-xs text-blue-950 font-medium">
-              <li>
-                Buka Spreadsheet Anda:{' '}
-                <a
-                  href={SPREADSHEET_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-bold underline text-[#0056b3] inline-flex items-center gap-1"
-                >
-                  Buka Spreadsheet Sumber <ExternalLink className="w-3 h-3" />
-                </a>
-              </li>
-              <li>
-                Di menu atas spreadsheet, klik: <strong>Ekstensi (Extensions)</strong> &gt; <strong>Apps Script</strong>.
-              </li>
-              <li>
-                Hapus kode default yang ada di dalam file <code>Code.gs</code>, lalu <strong>Salin (Copy)</strong> seluruh kode di bawah dan <strong>Paste (Tempel)</strong> ke sana.
-              </li>
-              <li>Klik ikon <strong>Simpan (Save / Disket)</strong>.</li>
-              <li>
-                Klik tombol biru <strong>Terapkan (Deploy)</strong> &gt; <strong>Penerapan baru (New deployment)</strong>.
-              </li>
-              <li>
-                Pilih jenis <strong>Aplikasi web (Web app)</strong>. Pada opsi <em>Who has access (Siapa yang memiliki akses)</em>, pilih <strong>Anyone (Siapa saja)</strong>. Lalu klik <strong>Deploy</strong>.
-              </li>
-              <li>Salin URL Aplikasi Web yang muncul (berakhiran <code>/exec</code>), lalu tempelkan ke kolom input di bawah.</li>
-            </ol>
-          </div>
-
           {/* Kolom Pengaturan URL Web App */}
-          <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-3">
-            <label className="block font-bold text-gray-800 text-xs">
-              Masukkan URL Web App Google Apps Script Anda (berakhiran /exec):
+          <div className="p-4 bg-emerald-50/80 border border-emerald-300 rounded-xl space-y-3">
+            <label className="block font-bold text-gray-900 text-xs flex items-center justify-between">
+              <span>Masukkan URL Web App Google Apps Script Anda (berakhiran /exec):</span>
+              <span className="text-[11px] text-emerald-800 font-semibold">Tersimpan di Sistem</span>
             </label>
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <input
@@ -345,7 +394,7 @@ export default function AppsScriptModal({ isOpen, onClose }) {
                 ) : (
                   <>
                     <Play className="w-4 h-4" />
-                    <span>Simpan & Tes</span>
+                    <span>Simpan &amp; Tes Koneksi</span>
                   </>
                 )}
               </button>
@@ -362,7 +411,7 @@ export default function AppsScriptModal({ isOpen, onClose }) {
                 {testResult.ok ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Sukses: {testResult.message || 'Koneksi ke Web App Spreadsheet berhasil terverifikasi!'}</span>
+                    <span>Sukses Terhubung: {testResult.message || 'Koneksi ke Web App Spreadsheet berhasil aktif!'}</span>
                   </>
                 ) : (
                   <>
@@ -374,10 +423,45 @@ export default function AppsScriptModal({ isOpen, onClose }) {
             )}
           </div>
 
+          {/* Langkah 1, 2, 3 */}
+          <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-4 text-blue-900 space-y-2">
+            <h3 className="font-bold flex items-center gap-2 text-sm text-[#0056b3]">
+              <HelpCircle className="w-4 h-4" />
+              Cara Memasang Kode di Spreadsheet Anda:
+            </h3>
+            <ol className="list-decimal pl-5 space-y-1.5 text-xs text-blue-950 font-medium">
+              <li>
+                Buka Spreadsheet Anda:{' '}
+                <a
+                  href={SPREADSHEET_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-bold underline text-[#0056b3] inline-flex items-center gap-1"
+                >
+                  Buka Google Sheet Sumber <ExternalLink className="w-3 h-3" />
+                </a>
+              </li>
+              <li>
+                Di menu bar spreadsheet, klik: <strong>Ekstensi (Extensions)</strong> &gt; <strong>Apps Script</strong>.
+              </li>
+              <li>
+                Hapus seluruh teks di file <code>Code.gs</code>, lalu <strong>Salin (Copy)</strong> kode di bawah dan <strong>Paste (Tempel)</strong> ke sana.
+              </li>
+              <li>Klik ikon <strong>Simpan (Save / Disket)</strong>.</li>
+              <li>
+                Klik tombol biru <strong>Terapkan (Deploy)</strong> di kanan atas &gt; <strong>Penerapan baru (New deployment)</strong>.
+              </li>
+              <li>
+                Pilih jenis <strong>Aplikasi web (Web app)</strong>. Pada opsi <em>Who has access</em>, pilih <strong>Anyone (Siapa saja)</strong>. Lalu klik <strong>Deploy</strong>.
+              </li>
+              <li>Salin URL Aplikasi Web (berakhiran <code>/exec</code>), lalu tempelkan ke kolom input di atas dan klik <strong>Simpan &amp; Tes Koneksi</strong>.</li>
+            </ol>
+          </div>
+
           {/* Kotak Kode Code.gs */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-gray-700">Kode Lengkap (Code.gs):</span>
+              <span className="font-bold text-gray-700">Kode Lengkap (Code.gs) - Versi Terbaru:</span>
               <button
                 type="button"
                 onClick={handleCopy}
@@ -388,7 +472,7 @@ export default function AppsScriptModal({ isOpen, onClose }) {
               </button>
             </div>
 
-            <pre className="p-4 bg-gray-900 text-gray-100 rounded-xl font-mono text-[11px] overflow-x-auto max-h-[300px] leading-relaxed border border-gray-800">
+            <pre className="p-4 bg-gray-900 text-gray-100 rounded-xl font-mono text-[11px] overflow-x-auto max-h-[260px] leading-relaxed border border-gray-800">
               {APPS_SCRIPT_CODE}
             </pre>
           </div>
