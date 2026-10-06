@@ -224,7 +224,7 @@ export default function CetakPage() {
     window.print();
   }
 
-  // Fungsi mengunduh berkas fisik PDF langsung ke komputer (Satu .sheet = Satu Halaman PDF)
+  // Fungsi mengunduh berkas fisik PDF berbasis Teks & Vector (jsPDF + jspdf-autotable)
   async function handleDownloadPdf() {
     if (downloadingPdf) return;
 
@@ -232,14 +232,466 @@ export default function CetakPage() {
     const toastId = toast.loading('Sedang memproses dan membuat berkas PDF...');
 
     try {
-      // Tunggu font dan gambar selesai dimuat sepenuhnya
-      if (typeof document !== 'undefined' && document.fonts) {
-        await document.fonts.ready;
+      const { jsPDF } = await import('jspdf');
+      const autoTableModule = await import('jspdf-autotable');
+      const autoTable = autoTableModule.default || autoTableModule;
+
+      // =========================================================================
+      // 1. FORMAT: LAMPIRAN DETAIL PESERTA TIDAK HADIR
+      // =========================================================================
+      if (printFormat === 'list_tidak_hadir') {
+        const groups = {};
+        const seenPerTraining = new Set();
+
+        for (const item of (listTidakHadirData || [])) {
+          const trName = String(item.training || 'LAINNYA').trim().toUpperCase();
+          const nik = String(item.nik || '').trim();
+          const dedupKey = `${trName}__${nik}`;
+
+          if (seenPerTraining.has(dedupKey)) continue;
+          seenPerTraining.add(dedupKey);
+
+          if (!groups[trName]) groups[trName] = [];
+          groups[trName].push({
+            training: trName,
+            nik: nik,
+            nama: String(item.nama || '').trim().toUpperCase(),
+            kd_toko: String(item.kd_toko || item.kode_toko || '-').trim().toUpperCase(),
+            nama_toko: String(item.nama_toko || '-').trim().toUpperCase(),
+            alasan_tidak_hadir: String(item.alasan_tidak_hadir || item.alasan || '-').trim(),
+          });
+        }
+
+        const sortedKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+        let filteredKeys = sortedKeys;
+        if (selectedTrainingListFilter) {
+          filteredKeys = sortedKeys.filter(
+            (k) => k.toLowerCase() === selectedTrainingListFilter.toLowerCase()
+          );
+        }
+
+        const trTag = selectedTrainingListFilter
+          ? `_${selectedTrainingListFilter.replace(/[^a-zA-Z0-9]/g, '_')}`
+          : '_Semua_Training';
+        const filename = `Lampiran_Detail_Peserta_Tidak_Hadir${trTag}.pdf`;
+
+        const doc = new jsPDF({
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',
+        });
+
+        if (filteredKeys.length === 0) {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(15);
+          doc.text('LAMPIRAN DETAIL PESERTA TIDAK HADIR', 105, 18, { align: 'center' });
+          doc.setFontSize(12);
+          doc.text('JENIS TRAINING: -', 105, 25, { align: 'center' });
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.text('Tidak ada data peserta tidak hadir.', 105, 45, { align: 'center' });
+          doc.save(filename);
+          toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });
+          return;
+        }
+
+        let totalPageCounter = 0;
+
+        for (let gIdx = 0; gIdx < filteredKeys.length; gIdx++) {
+          const groupKey = filteredKeys[gIdx];
+          const groupItems = groups[groupKey];
+          const totalGroupItems = groupItems.length;
+
+          const chunkSize = 40;
+          const chunkCount = Math.ceil(groupItems.length / chunkSize) || 1;
+
+          for (let cIdx = 0; cIdx < chunkCount; cIdx++) {
+            totalPageCounter++;
+
+            if (totalPageCounter > 1) {
+              doc.addPage('a4', 'portrait');
+            }
+
+            const chunkItems = groupItems.slice(cIdx * chunkSize, (cIdx + 1) * chunkSize);
+            const startNo = cIdx * chunkSize + 1;
+
+            // Header Judul 15pt bold center
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(15);
+            doc.setTextColor(0, 0, 0);
+            doc.text('LAMPIRAN DETAIL PESERTA TIDAK HADIR', 105, 18, { align: 'center' });
+
+            // Subjudul 12pt bold center, 2mm gap below main title, 6mm space before table
+            doc.setFontSize(12);
+            doc.text(`JENIS TRAINING: ${groupKey}`, 105, 25, { align: 'center' });
+
+            const tableRows = chunkItems.map((item, idx) => [
+              String(startNo + idx),
+              item.training,
+              item.nik,
+              item.nama,
+              item.kd_toko,
+              item.nama_toko,
+              item.alasan_tidak_hadir,
+            ]);
+
+            const startY = 31; // 25 + 6mm gap = 31mm
+
+            autoTable(doc, {
+              startY: startY,
+              head: [['NO', 'TRAINING', 'NIK', 'NAMA', 'KD TOKO', 'NAMA TOKO', 'ALASAN TIDAK HADIR']],
+              body: tableRows,
+              theme: 'grid',
+              margin: { left: 12, right: 12, top: 31, bottom: 20 },
+              styles: {
+                font: 'helvetica',
+                fontSize: 9,
+                textColor: [0, 0, 0],
+                cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
+                valign: 'middle',
+                minCellHeight: 7,
+                overflow: 'linebreak',
+                lineWidth: 0.2,
+                lineColor: [0, 0, 0],
+              },
+              headStyles: {
+                fontStyle: 'bold',
+                fillColor: [242, 242, 242],
+                textColor: [0, 0, 0],
+                halign: 'center',
+                valign: 'middle',
+                lineWidth: 0.2,
+                lineColor: [0, 0, 0],
+              },
+              columnStyles: {
+                0: { halign: 'center', cellWidth: 10 },
+                1: { halign: 'center', cellWidth: 26 },
+                2: { halign: 'center', cellWidth: 26 },
+                3: { halign: 'left', cellWidth: 44 },
+                4: { halign: 'center', cellWidth: 18 },
+                5: { halign: 'left', cellWidth: 36 },
+                6: { halign: 'left', cellWidth: 26 },
+              },
+              didDrawPage: function () {
+                const pageY = 284;
+                doc.setLineWidth(0.2);
+                doc.setDrawColor(0, 0, 0);
+                doc.line(12, pageY - 2, 198, pageY - 2);
+
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(85, 85, 85);
+                doc.text(
+                  `Dokumen Rekapitulasi Ketidakhadiran Peserta Training • Jenis Training: ${groupKey} (${totalGroupItems} Peserta)`,
+                  12,
+                  pageY + 2
+                );
+
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text(`Halaman ${totalPageCounter}`, 198, pageY + 2, { align: 'right' });
+              },
+            });
+          }
+        }
+
+        doc.save(filename);
+        toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });
+        return;
       }
 
-      const { jsPDF } = await import('jspdf');
-      const html2canvas = (await import('html2canvas')).default;
+      // =========================================================================
+      // 2. FORMAT: BERITA ACARA REKAPITULASI DISPENSASI
+      // =========================================================================
+      if (printFormat === 'rekap_dispensasi') {
+        const doc = new jsPDF({
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',
+        });
 
+        const filename = `Berita_Acara_Rekapitulasi_Training_${bulanCetak}_${tahunCetak}_${ttdMode}.pdf`;
+
+        // Header Judul
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text('BERITA ACARA KETIDAKHADIRAN PESERTA TRAINING', 105, 18, { align: 'center' });
+        doc.text('DAN PERMOHONAN DISPENSASI KETIDAKHADIRAN', 105, 24, { align: 'center' });
+
+        // Paragraf Pengantar
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        const introText = `Pada pelaksanaan kegiatan ${cabangCetak} periode Bulan ${bulanCetak} Tahun ${tahunCetak}, ditemukan adanya peserta training karyawan eksisting yang tidak dapat mengikuti beberapa jenis training. Berikut kami sampaikan rekapitulasi ketidakhadiran peserta berdasarkan jenis training sebagai dasar pengajuan dispensasi kepada ETD.`;
+        const splitIntro = doc.splitTextToSize(introText, 186);
+        doc.text(splitIntro, 12, 33);
+
+        let currentY = 33 + splitIntro.length * 5 + 2;
+
+        const tableRows = (rekapData || []).map((row, idx) => [
+          String(row.no || idx + 1),
+          String(row.jenis_training || '').toUpperCase(),
+          String(row.target_lskt || ''),
+          String(row.dispensasi || ''),
+          String(row.target_tc_report || ''),
+          String(row.hadir || ''),
+          String(row.tidak_hadir || ''),
+          String(row.no_list_peserta_tidak_hadir || '').toUpperCase(),
+        ]);
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [['NO', 'JENIS TRAINING', 'TARGET LSKT', 'DISPENSASI', 'TARGET', 'HADIR', 'TIDAK HADIR', 'NO LIST PESERTA TIDAK HADIR']],
+          body: tableRows,
+          theme: 'grid',
+          margin: { left: 12, right: 12, bottom: 20 },
+          styles: {
+            font: 'helvetica',
+            fontSize: 8.5,
+            textColor: [0, 0, 0],
+            cellPadding: { top: 2, bottom: 2, left: 1.5, right: 1.5 },
+            valign: 'middle',
+            minCellHeight: 6.5,
+            lineWidth: 0.2,
+            lineColor: [0, 0, 0],
+          },
+          headStyles: {
+            fontStyle: 'bold',
+            fillColor: [242, 242, 242],
+            textColor: [0, 0, 0],
+            halign: 'center',
+            valign: 'middle',
+            lineWidth: 0.2,
+            lineColor: [0, 0, 0],
+          },
+          columnStyles: {
+            0: { halign: 'center', cellWidth: 10 },
+            1: { halign: 'left', cellWidth: 42 },
+            2: { halign: 'center', cellWidth: 20 },
+            3: { halign: 'center', cellWidth: 22 },
+            4: { halign: 'center', cellWidth: 18 },
+            5: { halign: 'center', cellWidth: 16 },
+            6: { halign: 'center', cellWidth: 18 },
+            7: { halign: 'center', cellWidth: 40 },
+          },
+        });
+
+        currentY = doc.lastAutoTable.finalY + 6;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.text('Data Pendukung', 12, currentY);
+        currentY += 4.5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text('Sebagai data pendukung, bersama Berita Acara ini kami lampirkan:', 12, currentY);
+        currentY += 4.5;
+        doc.text('1. Daftar peserta yang tidak hadir pada masing-masing jenis training.', 16, currentY);
+        currentY += 4;
+        doc.text('2. Alasan ketidakhadiran setiap peserta.', 16, currentY);
+        currentY += 4;
+        doc.text('3. Bukti pendukung ketidakhadiran (apabila tersedia).', 16, currentY);
+        currentY += 6;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.text('Permohonan Dispensasi Ketidakhadiran', 12, currentY);
+        currentY += 4.5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        const p2 = 'Sehubungan dengan data ketidakhadiran tersebut, kami memohon kepada Bapak/Ibu ETD untuk memberikan dispensasi kepada peserta yang tercantum dalam daftar ketidakhadiran, sehingga ketidakhadiran tersebut tidak diperhitungkan sebagai pengurang poin rating sesuai ketentuan yang berlaku.';
+        const splitP2 = doc.splitTextToSize(p2, 186);
+        doc.text(splitP2, 12, currentY);
+        currentY += splitP2.length * 4 + 4;
+
+        const p3 = 'Demikian Berita Acara dan permohonan dispensasi ini kami sampaikan. Atas perhatian dan persetujuan Bapak/Ibu, kami ucapkan terima kasih.';
+        const splitP3 = doc.splitTextToSize(p3, 186);
+        doc.text(splitP3, 12, currentY);
+        currentY += splitP3.length * 4 + 6;
+
+        doc.text(tanggalCetak, 198, currentY, { align: 'right' });
+        currentY += 5;
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [[
+            { content: 'Mengetahui,', colSpan: 3, styles: { halign: 'center', fontStyle: 'bold' } },
+            { content: 'Dibuat oleh,', colSpan: 1, styles: { halign: 'center', fontStyle: 'bold' } }
+          ]],
+          body: [[
+            'DBM Operasional',
+            'DBM Admin',
+            'HRD Manager',
+            'TC Supervisor'
+          ]],
+          theme: 'grid',
+          margin: { left: 12, right: 12 },
+          styles: {
+            font: 'helvetica',
+            fontSize: 9,
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'bottom',
+            minCellHeight: 20,
+            lineWidth: 0.2,
+            lineColor: [0, 0, 0],
+            cellPadding: 2,
+          },
+          headStyles: {
+            fillColor: [255, 255, 255],
+            textColor: [0, 0, 0],
+            lineWidth: 0.2,
+            lineColor: [0, 0, 0],
+          },
+          columnStyles: {
+            0: { cellWidth: 46.5 },
+            1: { cellWidth: 46.5 },
+            2: { cellWidth: 46.5 },
+            3: { cellWidth: 46.5 },
+          },
+        });
+
+        doc.save(filename);
+        toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });
+        return;
+      }
+
+      // =========================================================================
+      // 3. FORMAT: BERITA ACARA SOFT SKILL
+      // =========================================================================
+      if (printFormat === 'soft_skill') {
+        const doc = new jsPDF({
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',
+        });
+
+        const filename = `Berita_Acara_Soft_Skill_${softSkillPeriode.replace(/[^a-zA-Z0-9]/g, '_')}_${softSkillTtdMode}.pdf`;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text('BERITA ACARA', 105, 18, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text('PESERTA GAGAL MENGIKUTI TRAINING SOFT SKILL DASAR PIMPINAN SHIFT', 105, 24, { align: 'center' });
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        const pText = `Pada hari ini, ${softSkillTanggalDibuat}, kami yang bertanda tangan di bawah ini menyatakan bahwa peserta berikut dari Cabang ${softSkillCabang} tidak dapat mengikuti Training Soft Skill Dasar Pimpinan Shift pada periode ${softSkillPeriode} dengan alasan sebagaimana tercantum di bawah ini.`;
+        const splitP = doc.splitTextToSize(pText, 186);
+        doc.text(splitP, 12, 33);
+
+        let currentY = 33 + splitP.length * 4.5 + 3;
+
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Cabang : ${softSkillCabang}`, 12, currentY);
+        currentY += 4.5;
+        doc.text(`Periode Training : ${softSkillPeriode}`, 12, currentY);
+        currentY += 4.5;
+        doc.text(`Tanggal Dibuat : ${softSkillTanggalDibuat}`, 12, currentY);
+        currentY += 6;
+
+        doc.text('Daftar Peserta Gagal Training:', 12, currentY);
+        currentY += 4;
+
+        const tableRows = (softSkillData || []).map((row, idx) => [
+          String(row.no || idx + 1),
+          String(row.nik || ''),
+          String(row.nama || '').toUpperCase(),
+          String(row.jabatan || ''),
+          String(row.kategory || row.kategori || '-'),
+          String(row.detail_alasan || '-'),
+        ]);
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [['No', 'NIK', 'Nama', 'Jabatan', 'Kategori', 'Detail Alasan']],
+          body: tableRows,
+          theme: 'grid',
+          margin: { left: 12, right: 12, bottom: 20 },
+          styles: {
+            font: 'helvetica',
+            fontSize: 9,
+            textColor: [0, 0, 0],
+            cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
+            valign: 'middle',
+            minCellHeight: 7,
+            lineWidth: 0.2,
+            lineColor: [0, 0, 0],
+          },
+          headStyles: {
+            fontStyle: 'bold',
+            fillColor: [30, 96, 213],
+            textColor: [255, 255, 255],
+            halign: 'center',
+            valign: 'middle',
+            lineWidth: 0.2,
+            lineColor: [0, 0, 0],
+          },
+          columnStyles: {
+            0: { halign: 'center', cellWidth: 10 },
+            1: { halign: 'center', cellWidth: 28 },
+            2: { halign: 'left', cellWidth: 50 },
+            3: { halign: 'left', cellWidth: 38 },
+            4: { halign: 'center', cellWidth: 22 },
+            5: { halign: 'left', cellWidth: 38 },
+          },
+        });
+
+        currentY = doc.lastAutoTable.finalY + 6;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        doc.text('Demikian berita acara ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.', 12, currentY);
+        currentY += 8;
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [[
+            'Mengetahui 2,\nDeputy Branch Manager ADM',
+            'Mengetahui 1,\nHuman Resource Manager',
+            'Membuat,\nTraining Center Supervisor'
+          ]],
+          body: [[
+            'RICKY MARIO',
+            'ABEDNEGO SETYA NUGROHO',
+            'ROKHMAN'
+          ]],
+          theme: 'grid',
+          margin: { left: 12, right: 12 },
+          styles: {
+            font: 'helvetica',
+            fontSize: 9,
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'bottom',
+            minCellHeight: 22,
+            lineWidth: 0.2,
+            lineColor: [0, 0, 0],
+            cellPadding: 2,
+          },
+          headStyles: {
+            fillColor: [255, 255, 255],
+            textColor: [0, 0, 0],
+            lineWidth: 0.2,
+            lineColor: [0, 0, 0],
+          },
+          columnStyles: {
+            0: { cellWidth: 62 },
+            1: { cellWidth: 62 },
+            2: { cellWidth: 62 },
+          },
+        });
+
+        doc.save(filename);
+        toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });
+        return;
+      }
+
+      // Fallback untuk format foto horizontal / lama jika dipilih
+      const html2canvas = (await import('html2canvas')).default;
       const sheets = document.querySelectorAll('.sheet');
       if (!sheets || sheets.length === 0) {
         throw new Error('Elemen lembar dokumen (.sheet) tidak ditemukan');
@@ -251,7 +703,7 @@ export default function CetakPage() {
       const pdfHeight = isLandscape ? 210 : 297;
       const windowWidthPx = isLandscape ? 1123 : 794;
 
-      const pdf = new jsPDF({
+      const doc = new jsPDF({
         unit: 'mm',
         format: 'a4',
         orientation: orientation,
@@ -273,28 +725,17 @@ export default function CetakPage() {
         const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
         if (i > 0) {
-          pdf.addPage('a4', orientation);
+          doc.addPage('a4', orientation);
         }
 
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       }
 
-      // Tentukan nama berkas sesuai format yang aktif
-      let filename = 'Dokumen_Ketidakhadiran_Training.pdf';
-      if (printFormat === 'rekap_dispensasi') {
-        filename = `Berita_Acara_Rekapitulasi_Training_${bulanCetak}_${tahunCetak}_${ttdMode}.pdf`;
-      } else if (printFormat === 'soft_skill') {
-        filename = `Berita_Acara_Soft_Skill_${softSkillPeriode.replace(/[^a-zA-Z0-9]/g, '_')}_${softSkillTtdMode}.pdf`;
-      } else if (printFormat === 'list_tidak_hadir') {
-        const trTag = selectedTrainingListFilter ? `_${selectedTrainingListFilter.replace(/[^a-zA-Z0-9]/g, '_')}` : '_Semua_Training';
-        filename = `Lampiran_Detail_Peserta_Tidak_Hadir${trTag}.pdf`;
-      } else if (printFormat === 'horizontal') {
-        filename = `Lampiran_Bukti_Foto_Horizontal_${year}.pdf`;
-      } else {
-        filename = `Berita_Acara_Lama_${year}.pdf`;
-      }
+      let filename = printFormat === 'horizontal'
+        ? `Lampiran_Bukti_Foto_Horizontal_${year}.pdf`
+        : `Berita_Acara_Lama_${year}.pdf`;
 
-      pdf.save(filename);
+      doc.save(filename);
       toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });
     } catch (err) {
       console.error('[Download PDF Error]:', err);
