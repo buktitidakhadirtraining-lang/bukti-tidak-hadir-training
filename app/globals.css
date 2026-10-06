@@ -37,9 +37,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 8mm;
+  }
+  html, body {
     background: white !important;
     color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   .no-print {
     display: none !important;
@@ -61,6 +67,16 @@ h1, h2, h3, h4, h5, h6 {
   }
   thead {
     display: table-header-group;
+  }
+  /* Saat cetak browser, container halaman mengambil 1 lembar penuh */
+  .pdf-page-container {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
 

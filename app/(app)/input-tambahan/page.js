@@ -12,6 +12,7 @@ import {
   TableProperties,
   ArrowRight,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SPREADSHEET_URL } from '../../../lib/config.js';
