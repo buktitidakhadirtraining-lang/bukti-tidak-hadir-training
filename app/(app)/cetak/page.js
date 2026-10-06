@@ -528,13 +528,13 @@ export default function CetakPage() {
 
           <div className="text-xs text-gray-500">
             {printFormat === 'rekap_dispensasi' && (
-              <span>Sumber Data: <strong className="text-gray-800">Sheet cetak_rekap</strong> ({rekapData.length} baris)</span>
+              <span>Total: <strong className="text-gray-800">{rekapData.length}</strong> baris rekap</span>
             )}
             {printFormat === 'soft_skill' && (
-              <span>Sumber Data: <strong className="text-gray-800">Sheet list_soft_skill</strong> ({softSkillData.length} peserta)</span>
+              <span>Total: <strong className="text-gray-800">{softSkillData.length}</strong> peserta</span>
             )}
             {printFormat === 'list_tidak_hadir' && (
-              <span>Sumber Data: <strong className="text-gray-800">Sheet list_tidak_hadir</strong> ({listTidakHadirData.length} peserta)</span>
+              <span>Total: <strong className="text-gray-800">{listTidakHadirData.length}</strong> peserta tidak hadir</span>
             )}
             {(printFormat === 'horizontal' || printFormat === 'lama') && (
               <span>Menampilkan: <strong className="text-gray-800">{records.length}</strong> data</span>
