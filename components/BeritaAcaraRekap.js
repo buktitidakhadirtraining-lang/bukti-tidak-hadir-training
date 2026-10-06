@@ -3,92 +3,139 @@
 
 import React from 'react';
 
-// Tanda Tangan SVG Asli Sesuai Dokumen Indomaret (Gambar 3)
-export function SignatureDbmOps() {
+// Tanda Tangan Otentik Sesuai Dokumen Resmi Indomaret (Gambar 2 & Gambar 3)
+// Menggunakan kurva Bezier halus menyerupai goresan pena bolpoin asli
+export function SignatureDbmOps({ inkColor = '#122b52' }) {
   return (
-    <div className="relative w-36 h-20 mx-auto flex items-center justify-center">
+    <div className="relative w-36 h-20 mx-auto flex items-center justify-center pointer-events-none select-none">
       <svg
-        viewBox="0 0 160 85"
-        className="w-full h-full stroke-black fill-none"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {/* Garis vertikal & salib dinamis */}
-        <path d="M 75 75 L 75 10" />
-        <path d="M 45 42 L 105 40" />
-        <path d="M 55 30 L 95 55" />
-        <path d="M 52 50 Q 75 42 98 48" />
-        <path d="M 60 38 Q 72 58 84 36" />
-        <path d="M 68 45 L 80 62" />
-        <path d="M 88 35 Q 98 45 92 58 Q 85 70 70 70" />
-      </svg>
-      {/* Tulisan tangan 'Ach' di bawah garis */}
-      <span
-        className="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs font-bold text-black select-none pointer-events-none"
-        style={{ fontFamily: 'cursive, sans-serif' }}
-      >
-        Ach
-      </span>
-    </div>
-  );
-}
-
-export function SignatureDbmAdmin() {
-  return (
-    <div className="w-36 h-20 mx-auto flex items-center justify-center">
-      <svg
-        viewBox="0 0 160 85"
-        className="w-full h-full stroke-black fill-none"
+        viewBox="0 0 170 85"
+        className="w-full h-full fill-none"
+        stroke={inkColor}
         strokeWidth="2.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        {/* Tulisan tangan khas 'Ridy' dengan loop melengkung */}
-        <path d="M 38 65 L 42 22 Q 58 16 64 32 Q 62 44 48 45 L 70 65" />
-        <path d="M 76 34 L 76 56 M 76 25 L 77 25" />
-        <path d="M 84 56 L 84 22 M 84 40 Q 98 34 98 46 Q 98 56 84 56" />
-        <path d="M 104 36 L 108 52 Q 115 32 120 36 L 112 72 Q 105 78 92 72" />
-        {/* Garis bawah flourish panjang */}
-        <path d="M 30 70 Q 80 60 135 65" strokeWidth="2.2" />
+        {/* Sapuan awal naik dan melingkar membentuk inisial elegan */}
+        <path
+          d="M 28 62 C 34 50, 48 24, 62 14 C 74 6, 82 12, 78 28 C 72 48, 52 74, 46 76 C 42 78, 40 70, 46 58 C 54 44, 76 34, 94 38"
+          strokeWidth="2.6"
+        />
+        {/* Irama cursive ritmis di bagian tengah tanda tangan */}
+        <path
+          d="M 88 42 C 96 36, 104 46, 108 56 C 112 42, 122 40, 126 52 C 130 44, 138 42, 142 54"
+          strokeWidth="2.3"
+        />
+        {/* Garis palang aksen menyilang tegas */}
+        <path
+          d="M 52 46 C 78 43, 115 41, 148 44"
+          strokeWidth="2.4"
+        />
+        {/* Sapuan underline melengkung cepat khas tanda tangan manajerial */}
+        <path
+          d="M 32 72 C 64 68, 114 66, 156 70 C 160 70, 162 67, 158 64"
+          strokeWidth="2.5"
+        />
       </svg>
     </div>
   );
 }
 
-export function SignatureHrdManager() {
+export function SignatureDbmAdmin({ inkColor = '#122b52' }) {
   return (
-    <div className="w-36 h-20 mx-auto flex items-center justify-center">
+    <div className="relative w-36 h-20 mx-auto flex items-center justify-center pointer-events-none select-none">
       <svg
-        viewBox="0 0 160 85"
-        className="w-full h-full stroke-black fill-none"
-        strokeWidth="2.2"
+        viewBox="0 0 170 85"
+        className="w-full h-full fill-none"
+        stroke={inkColor}
+        strokeWidth="2.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        {/* Loop tegak elegan meliuk */}
-        <path d="M 70 72 Q 48 50 64 20 Q 80 8 82 36 Q 80 66 58 60" />
-        <path d="M 68 32 Q 92 24 88 52 Q 86 72 108 64" />
-        <path d="M 62 64 Q 98 42 118 64" strokeWidth="2" />
+        {/* Inisial R (Ricky Mario) dengan tiang tegak melengkung dan kepala melingkar anggun */}
+        <path
+          d="M 36 74 C 38 52, 42 26, 44 14 C 48 8, 66 6, 74 18 C 80 28, 76 42, 58 44 C 50 45, 44 44, 44 44"
+          strokeWidth="2.8"
+        />
+        {/* Kaki huruf R turun lalu menyambung ke huruf cursive 'icky' */}
+        <path
+          d="M 54 44 C 62 54, 72 68, 78 72 C 84 76, 88 66, 92 50 C 96 42, 102 54, 106 58 C 110 44, 118 42, 122 56 C 126 44, 134 46, 138 58"
+          strokeWidth="2.4"
+        />
+        {/* Titik aksen di atas */}
+        <circle cx="94" cy="34" r="1.8" fill={inkColor} stroke="none" />
+        {/* Sapuan ekor panjang melengkung melintang ke bawah membentuk underline tegas */}
+        <path
+          d="M 136 58 C 144 48, 148 64, 138 72 C 118 80, 78 76, 32 73 C 24 72, 42 70, 88 68 C 126 66, 158 68, 164 71"
+          strokeWidth="2.6"
+        />
       </svg>
     </div>
   );
 }
 
-export function SignatureTcSupervisor() {
+export function SignatureHrdManager({ inkColor = '#122b52' }) {
   return (
-    <div className="w-36 h-20 mx-auto flex items-center justify-center">
+    <div className="relative w-36 h-20 mx-auto flex items-center justify-center pointer-events-none select-none">
       <svg
-        viewBox="0 0 160 85"
-        className="w-full h-full stroke-black fill-none"
-        strokeWidth="2.2"
+        viewBox="0 0 170 85"
+        className="w-full h-full fill-none"
+        stroke={inkColor}
+        strokeWidth="2.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        {/* Tanda bintang dan garis melingkar tegas */}
-        <path d="M 64 68 L 82 16 M 70 28 L 102 54 M 56 44 L 95 38" />
-        <path d="M 78 24 Q 118 12 124 42 Q 128 72 70 66 Q 46 62 82 50 Q 118 38 128 56" />
-        <path d="M 82 54 Q 92 68 102 48" />
+        {/* Monogram A / ASN (Abednego Setya Nugroho): loop tegak tinggi meliuk melengkung */}
+        <path
+          d="M 58 78 C 42 62, 46 28, 64 12 C 80 0, 96 16, 88 42 C 80 66, 62 76, 56 68 C 50 60, 68 46, 86 36 C 98 28, 108 34, 112 48"
+          strokeWidth="2.7"
+        />
+        {/* Gelombang cursive tengah */}
+        <path
+          d="M 108 48 C 114 42, 122 40, 126 52 C 130 42, 138 44, 142 56 C 146 46, 152 48, 156 58"
+          strokeWidth="2.3"
+        />
+        {/* Garis flourish melintang di bawah sebagai penegas */}
+        <path
+          d="M 42 74 C 74 62, 118 58, 158 66 C 162 67, 154 62, 138 60"
+          strokeWidth="2.5"
+        />
+      </svg>
+    </div>
+  );
+}
+
+export function SignatureTcSupervisor({ inkColor = '#122b52' }) {
+  return (
+    <div className="relative w-36 h-20 mx-auto flex items-center justify-center pointer-events-none select-none">
+      <svg
+        viewBox="0 0 170 85"
+        className="w-full h-full fill-none"
+        stroke={inkColor}
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {/* Tanda tangan Rokhman (TC Supervisor): inisial tajam, loop melingkar, dan aksen menyilang */}
+        <path
+          d="M 46 72 C 54 48, 64 22, 72 10 C 76 6, 88 8, 92 20 C 96 34, 88 48, 74 54 C 64 58, 58 52, 64 42 C 72 32, 94 28, 114 36"
+          strokeWidth="2.7"
+        />
+        {/* Coretan ritmis zig-zag cursive khas TC */}
+        <path
+          d="M 82 50 L 92 68 L 98 42 L 106 66 L 114 44 L 122 64 L 132 46"
+          strokeWidth="2.4"
+        />
+        {/* Goresan diagonal tegas menyilang tiang */}
+        <path
+          d="M 44 48 C 76 38, 116 32, 148 42"
+          strokeWidth="2.5"
+        />
+        {/* Aksen penutup bawah */}
+        <path
+          d="M 72 74 C 98 70, 132 68, 158 72"
+          strokeWidth="2.3"
+        />
       </svg>
     </div>
   );
@@ -96,29 +143,30 @@ export function SignatureTcSupervisor() {
 
 export default function BeritaAcaraRekap({
   data = [],
-  ttdMode = 'kosong', // 'kosong' (Gambar 2) | 'ada' (Gambar 3)
+  ttdMode = 'ada', // 'kosong' (Gambar 2) | 'ada' (Gambar 3)
   tanggalCetak = 'Surabaya, 5 Oktober 2026',
   cabang = 'Training Center Cabang Surabaya',
   bulan = 'Oktober',
   tahun = '2026',
+  inkColor = '#122b52', // Warna bolpoin resmi: navy/biru tua atau hitam
 }) {
   return (
     <div
-      className="bg-white text-black p-8 sm:p-12 max-w-4xl mx-auto shadow-sm print:p-0 print:shadow-none print:max-w-none text-xs leading-relaxed"
+      className="bg-white text-black p-6 sm:p-10 max-w-4xl mx-auto shadow-sm print:p-0 print:shadow-none print:max-w-none text-xs leading-relaxed pdf-page-container"
       style={{ fontFamily: "'Times New Roman', Times, serif" }}
     >
       {/* 1. Header Judul Berita Acara */}
-      <div className="text-center space-y-1 mb-6">
-        <h1 className="text-base sm:text-lg font-bold tracking-wide uppercase">
+      <div className="text-center space-y-0.5 mb-4">
+        <h1 className="text-base sm:text-lg font-bold tracking-wide uppercase leading-tight">
           BERITA ACARA KETIDAKHADIRAN PESERTA TRAINING
         </h1>
-        <h2 className="text-base sm:text-lg font-bold tracking-wide uppercase">
+        <h2 className="text-base sm:text-lg font-bold tracking-wide uppercase leading-tight">
           DAN PERMOHONAN DISPENSASI KETIDAKHADIRAN
         </h2>
       </div>
 
       {/* 2. Paragraf Pengantar */}
-      <p className="text-justify mb-5 leading-normal">
+      <p className="text-justify mb-3 leading-normal">
         Pada pelaksanaan kegiatan {cabang} periode Bulan <span className="font-bold">{bulan}</span> Tahun{' '}
         <span className="font-bold">{tahun}</span>, ditemukan adanya peserta training karyawan eksisting yang
         tidak dapat mengikuti beberapa jenis training. Berikut kami sampaikan rekapitulasi ketidakhadiran peserta
@@ -126,7 +174,7 @@ export default function BeritaAcaraRekap({
       </p>
 
       {/* 3. Tabel Rekapitulasi (Sesuai Format Gambar 2) */}
-      <div className="overflow-x-auto mb-6">
+      <div className="overflow-x-auto mb-4">
         <table
           className="w-full text-center border-collapse"
           style={{ border: '1.5px solid #000000', fontSize: '11px' }}
@@ -134,49 +182,49 @@ export default function BeritaAcaraRekap({
           <thead>
             <tr style={{ backgroundColor: '#ffffff' }}>
               <th
-                className="p-1.5 font-bold uppercase"
-                style={{ border: '1.5px solid #000000', width: '38px' }}
+                className="p-1 font-bold uppercase"
+                style={{ border: '1.5px solid #000000', width: '36px' }}
               >
                 NO
               </th>
               <th
-                className="p-1.5 font-bold uppercase text-left"
+                className="p-1 font-bold uppercase text-left"
                 style={{ border: '1.5px solid #000000', width: '160px' }}
               >
                 JENIS TRAINING
               </th>
               <th
-                className="p-1.5 font-bold uppercase"
+                className="p-1 font-bold uppercase"
                 style={{ border: '1.5px solid #000000', width: '75px' }}
               >
                 TARGET LSKT
               </th>
               <th
-                className="p-1.5 font-bold uppercase"
+                className="p-1 font-bold uppercase"
                 style={{ border: '1.5px solid #000000', width: '85px' }}
               >
                 DISPENSASI
               </th>
               <th
-                className="p-1.5 font-bold uppercase"
+                className="p-1 font-bold uppercase"
                 style={{ border: '1.5px solid #000000', width: '75px' }}
               >
                 TARGET
               </th>
               <th
-                className="p-1.5 font-bold uppercase"
+                className="p-1 font-bold uppercase"
                 style={{ border: '1.5px solid #000000', width: '65px' }}
               >
                 HADIR
               </th>
               <th
-                className="p-1.5 font-bold uppercase"
+                className="p-1 font-bold uppercase"
                 style={{ border: '1.5px solid #000000', width: '65px' }}
               >
                 TIDAK HADIR
               </th>
               <th
-                className="p-1.5 font-bold uppercase text-center"
+                className="p-1 font-bold uppercase text-center"
                 style={{ border: '1.5px solid #000000' }}
               >
                 NO LIST PESERTA TIDAK HADIR
@@ -186,33 +234,33 @@ export default function BeritaAcaraRekap({
           <tbody>
             {data && data.length > 0 ? (
               data.map((row, idx) => (
-                <tr key={row.id || idx}>
-                  <td className="p-1.5 font-semibold" style={{ border: '1px solid #000000' }}>
+                <tr key={row.id || idx} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                  <td className="p-1 font-semibold" style={{ border: '1px solid #000000' }}>
                     {row.no || idx + 1}
                   </td>
                   <td
-                    className="p-1.5 text-left font-semibold uppercase"
+                    className="p-1 text-left font-semibold uppercase"
                     style={{ border: '1px solid #000000' }}
                   >
                     {row.jenis_training}
                   </td>
-                  <td className="p-1.5" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '1px solid #000000' }}>
                     {row.target_lskt || ''}
                   </td>
-                  <td className="p-1.5" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '1px solid #000000' }}>
                     {row.dispensasi || ''}
                   </td>
-                  <td className="p-1.5" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '1px solid #000000' }}>
                     {row.target_tc_report || ''}
                   </td>
-                  <td className="p-1.5" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '1px solid #000000' }}>
                     {row.hadir || ''}
                   </td>
-                  <td className="p-1.5" style={{ border: '1px solid #000000' }}>
+                  <td className="p-1" style={{ border: '1px solid #000000' }}>
                     {row.tidak_hadir || ''}
                   </td>
                   <td
-                    className="p-1.5 font-medium text-center uppercase"
+                    className="p-1 font-medium text-center uppercase"
                     style={{ border: '1px solid #000000', fontSize: '10px' }}
                   >
                     {row.no_list_peserta_tidak_hadir || ''}
@@ -223,7 +271,7 @@ export default function BeritaAcaraRekap({
               <tr>
                 <td
                   colSpan={8}
-                  className="p-4 italic text-center text-gray-500"
+                  className="p-3 italic text-center text-gray-500"
                   style={{ border: '1px solid #000000' }}
                 >
                   Tidak ada data cetak_rekap yang tersedia.
@@ -235,7 +283,7 @@ export default function BeritaAcaraRekap({
       </div>
 
       {/* 4. Bagian Data Pendukung */}
-      <div className="space-y-1 mb-4 leading-normal">
+      <div className="space-y-0.5 mb-3 leading-normal">
         <p className="font-bold">Data Pendukung</p>
         <p>Sebagai data pendukung, bersama Berita Acara ini kami lampirkan:</p>
         <ol className="list-decimal pl-5 space-y-0.5">
@@ -246,7 +294,7 @@ export default function BeritaAcaraRekap({
       </div>
 
       {/* 5. Permohonan Dispensasi Ketidakhadiran */}
-      <div className="space-y-1 mb-4 leading-normal">
+      <div className="space-y-0.5 mb-3 leading-normal">
         <p className="font-bold">Permohonan Dispensasi Ketidakhadiran</p>
         <p className="text-justify">
           Sehubungan dengan data ketidakhadiran tersebut, kami memohon kepada Bapak/Ibu ETD untuk memberikan
@@ -256,7 +304,7 @@ export default function BeritaAcaraRekap({
       </div>
 
       {/* 6. Kalimat Penutup */}
-      <p className="mb-6 leading-normal">
+      <p className="mb-4 leading-normal">
         Demikian Berita Acara dan permohonan dispensasi ini kami sampaikan. Atas perhatian dan persetujuan
         Bapak/Ibu, kami ucapkan terima kasih.
       </p>
@@ -267,7 +315,7 @@ export default function BeritaAcaraRekap({
       </div>
 
       {/* 8. Kotak Tanda Tangan 4 Kolom (Sesuai Gambar 2 & Gambar 3) */}
-      <div className="overflow-x-auto print-break-avoid">
+      <div className="overflow-x-auto print-break-avoid" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
         <table
           className="w-full text-center border-collapse"
           style={{ border: '1.5px solid #000000', fontSize: '11px' }}
@@ -293,10 +341,10 @@ export default function BeritaAcaraRekap({
             <tr>
               {/* Kolom 1: DBM Operasional */}
               <td
-                className="p-2 align-bottom"
-                style={{ border: '1.5px solid #000000', height: '90px' }}
+                className="p-1.5 align-bottom"
+                style={{ border: '1.5px solid #000000', height: '85px' }}
               >
-                {ttdMode === 'ada' ? <SignatureDbmOps /> : <div className="h-16" />}
+                {ttdMode === 'ada' ? <SignatureDbmOps inkColor={inkColor} /> : <div className="h-16" />}
                 <div className="border-t border-black pt-1 mx-2">
                   <span className="font-bold block">DBM Operasional</span>
                 </div>
@@ -304,10 +352,10 @@ export default function BeritaAcaraRekap({
 
               {/* Kolom 2: DBM Admin */}
               <td
-                className="p-2 align-bottom"
-                style={{ border: '1.5px solid #000000', height: '90px' }}
+                className="p-1.5 align-bottom"
+                style={{ border: '1.5px solid #000000', height: '85px' }}
               >
-                {ttdMode === 'ada' ? <SignatureDbmAdmin /> : <div className="h-16" />}
+                {ttdMode === 'ada' ? <SignatureDbmAdmin inkColor={inkColor} /> : <div className="h-16" />}
                 <div className="border-t border-black pt-1 mx-2">
                   <span className="font-bold block">DBM Admin</span>
                 </div>
@@ -315,10 +363,10 @@ export default function BeritaAcaraRekap({
 
               {/* Kolom 3: HRD Manager */}
               <td
-                className="p-2 align-bottom"
-                style={{ border: '1.5px solid #000000', height: '90px' }}
+                className="p-1.5 align-bottom"
+                style={{ border: '1.5px solid #000000', height: '85px' }}
               >
-                {ttdMode === 'ada' ? <SignatureHrdManager /> : <div className="h-16" />}
+                {ttdMode === 'ada' ? <SignatureHrdManager inkColor={inkColor} /> : <div className="h-16" />}
                 <div className="border-t border-black pt-1 mx-2">
                   <span className="font-bold block">HRD Manager</span>
                 </div>
@@ -326,10 +374,10 @@ export default function BeritaAcaraRekap({
 
               {/* Kolom 4: TC Supervisor */}
               <td
-                className="p-2 align-bottom"
-                style={{ border: '1.5px solid #000000', height: '90px' }}
+                className="p-1.5 align-bottom"
+                style={{ border: '1.5px solid #000000', height: '85px' }}
               >
-                {ttdMode === 'ada' ? <SignatureTcSupervisor /> : <div className="h-16" />}
+                {ttdMode === 'ada' ? <SignatureTcSupervisor inkColor={inkColor} /> : <div className="h-16" />}
                 <div className="border-t border-black pt-1 mx-2">
                   <span className="font-bold block">TC Supervisor</span>
                 </div>

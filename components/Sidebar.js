@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   PlusCircle,
+  UserPlus,
   FileSpreadsheet,
   UploadCloud,
   Printer,
@@ -32,6 +33,7 @@ export default function Sidebar({
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/input', label: 'Input Data', icon: PlusCircle },
+    { href: '/input-tambahan', label: 'Input Data Tambahan', icon: UserPlus },
     { href: '/rekap', label: 'Rekap Data', icon: FileSpreadsheet },
     { href: '/import', label: 'Impor Excel/CSV', icon: UploadCloud },
     { href: '/cetak', label: 'Cetak Bukti PDF', icon: Printer },

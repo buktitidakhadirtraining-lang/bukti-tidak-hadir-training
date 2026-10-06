@@ -89,7 +89,26 @@ create table if not exists cetak_list_tidak_hadir (
 );
 
 -- ------------------------------------------------------------------------------
--- 5. TRIGGER OTOMATIS: Pencatatan ke data_tambahan saat ada input baru di absence_records
+-- 5. TABEL: list_soft_skill (Sesuai Sheet list_soft_skill Google Sheets)
+-- Header: NIK, Nama, Jabatan, Kategory, Detail Alasan
+-- Otomatis ditarik & disinkronisasi setiap 10 detik dari spreadsheet
+-- ------------------------------------------------------------------------------
+create table if not exists list_soft_skill (
+  id uuid primary key default gen_random_uuid(),
+  no int,
+  nik text not null,
+  nama text not null,
+  jabatan text default '',
+  kategory text default '',
+  detail_alasan text default '',
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
+create index if not exists idx_list_soft_skill_nik on list_soft_skill (nik);
+
+-- ------------------------------------------------------------------------------
+-- 6. TRIGGER OTOMATIS: Pencatatan ke data_tambahan saat ada input baru di absence_records
 -- ------------------------------------------------------------------------------
 create or replace function fn_auto_record_to_data_tambahan()
 returns trigger as $$
@@ -147,20 +166,22 @@ for each row
 execute function fn_auto_record_to_data_tambahan();
 
 -- ------------------------------------------------------------------------------
--- 6. HAK AKSES RLS (Row Level Security)
+-- 7. HAK AKSES RLS (Row Level Security)
 -- ------------------------------------------------------------------------------
 alter table cetak_rekap enable row level security;
 alter table list_tidak_hadir enable row level security;
 alter table data_tambahan enable row level security;
 alter table cetak_list_tidak_hadir enable row level security;
+alter table list_soft_skill enable row level security;
 
 -- Izinkan full access untuk backend / service_role
 create policy "Full access cetak_rekap" on cetak_rekap for all using (true) with check (true);
 create policy "Full access list_tidak_hadir" on list_tidak_hadir for all using (true) with check (true);
 create policy "Full access data_tambahan" on data_tambahan for all using (true) with check (true);
 create policy "Full access cetak_list_tidak_hadir" on cetak_list_tidak_hadir for all using (true) with check (true);
+create policy "Full access list_soft_skill" on list_soft_skill for all using (true) with check (true);
 
 -- ------------------------------------------------------------------------------
--- 7. REFRESH SCHEMA CACHE
+-- 8. REFRESH SCHEMA CACHE
 -- ------------------------------------------------------------------------------
 notify pgrst, 'reload schema';

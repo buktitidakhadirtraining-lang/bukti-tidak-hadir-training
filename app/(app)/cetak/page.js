@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { LOGO_URL, formatDateIndo } from '../../../lib/config.js';
 import BeritaAcaraRekap from '../../../components/BeritaAcaraRekap.js';
+import BeritaAcaraSoftSkill from '../../../components/BeritaAcaraSoftSkill.js';
 import LampiranListTidakHadir from '../../../components/LampiranListTidakHadir.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 
@@ -55,7 +56,8 @@ export default function CetakPage() {
 
   // Format Cetak:
   // - 'rekap_dispensasi': Berita Acara Rekapitulasi (Gambar 2 & Gambar 3) dari sheet 'cetak_rekap'
-  // - 'list_tidak_hadir': Lampiran Detail Peserta Tidak Hadir (Gambar 4) dari sheet 'list_tidak_hadir'
+  // - 'soft_skill': Berita Acara Soft Skill (Gambar 6 & 7) dari sheet 'list_soft_skill'
+  // - 'list_tidak_hadir': Lampiran Detail Peserta Tidak Hadir (Gambar 4 & 5) dari sheet 'list_tidak_hadir'
   // - 'horizontal': Grid Horizontal 4 Kolom Foto Bukti
   // - 'lama': Grid Vertikal Lama
   const [printFormat, setPrintFormat] = useState('rekap_dispensasi');
@@ -63,13 +65,23 @@ export default function CetakPage() {
   // Pengaturan Berita Acara Rekap (Gambar 2 & Gambar 3)
   const [rekapData, setRekapData] = useState([]);
   const [listTidakHadirData, setListTidakHadirData] = useState([]);
+  const [softSkillData, setSoftSkillData] = useState([]);
+
+  // Pengaturan Tanda Tangan & Tinta
   const [ttdMode, setTtdMode] = useState('ada'); // 'kosong' (Gambar 2) | 'ada' (Gambar 3)
+  const [inkColor, setInkColor] = useState('#122b52'); // Biru Bolpoin (#122b52) atau Hitam (#111827)
   const [tanggalCetak, setTanggalCetak] = useState('Surabaya, 5 Oktober 2026');
   const [cabangCetak, setCabangCetak] = useState('Training Center Cabang Surabaya');
   const [bulanCetak, setBulanCetak] = useState('Oktober');
   const [tahunCetak, setTahunCetak] = useState('2026');
 
-  // Pengaturan Lampiran List Tidak Hadir (Gambar 4)
+  // Pengaturan Khusus Berita Acara Soft Skill (Gambar 6 & 7)
+  const [softSkillTtdMode, setSoftSkillTtdMode] = useState('ada'); // 'ada' | 'kosong'
+  const [softSkillCabang, setSoftSkillCabang] = useState('Surabaya');
+  const [softSkillPeriode, setSoftSkillPeriode] = useState('September 2026');
+  const [softSkillTanggalDibuat, setSoftSkillTanggalDibuat] = useState('30 September 2026');
+
+  // Pengaturan Lampiran List Tidak Hadir (Gambar 4 & 5)
   const [selectedTrainingListFilter, setSelectedTrainingListFilter] = useState('');
 
   // Status Sinkronisasi Live Time 10 Detik
@@ -150,10 +162,13 @@ export default function CetakPage() {
         if (Array.isArray(json.listTidakHadir) && json.listTidakHadir.length > 0) {
           setListTidakHadirData(json.listTidakHadir);
         }
+        if (Array.isArray(json.softSkill) && json.softSkill.length > 0) {
+          setSoftSkillData(json.softSkill);
+        }
         setLastSyncTime(new Date());
         if (manual) {
           toast.success(
-            `Data tersinkronisasi: ${json.rekap?.length || 0} rekap, ${json.listTidakHadir?.length || 0} list peserta.`
+            `Data tersinkronisasi: ${json.rekap?.length || 0} rekap, ${json.softSkill?.length || 0} soft skill, ${json.listTidakHadir?.length || 0} list peserta.`
           );
         }
       }
@@ -232,6 +247,9 @@ export default function CetakPage() {
       if (printFormat === 'rekap_dispensasi') {
         filename = `Berita_Acara_Rekapitulasi_Training_${bulanCetak}_${tahunCetak}_${ttdMode}.pdf`;
         orientation = 'portrait';
+      } else if (printFormat === 'soft_skill') {
+        filename = `Berita_Acara_Soft_Skill_${softSkillPeriode.replace(/[^a-zA-Z0-9]/g, '_')}_${softSkillTtdMode}.pdf`;
+        orientation = 'portrait';
       } else if (printFormat === 'list_tidak_hadir') {
         const trTag = selectedTrainingListFilter ? `_${selectedTrainingListFilter.replace(/[^a-zA-Z0-9]/g, '_')}` : '_Semua_Training';
         filename = `Lampiran_Detail_Peserta_Tidak_Hadir${trTag}.pdf`;
@@ -245,11 +263,11 @@ export default function CetakPage() {
       }
 
       const opt = {
-        margin: [5, 5, 5, 5],
+        margin: [6, 6, 6, 6],
         filename: filename,
         image: { type: 'png' }, // Lossless PNG untuk ketajaman tulisan maksimal
         html2canvas: {
-          scale: 4, // Super Ultra-HD 4K (4x High-Density Pixel Mapping)
+          scale: 3, // Ultra-HD 300 DPI (3x High-Density Pixel Mapping)
           dpi: 300,
           letterRendering: true,
           useCORS: true,
@@ -258,7 +276,7 @@ export default function CetakPage() {
           backgroundColor: '#ffffff',
           scrollY: 0,
           scrollX: 0,
-          windowWidth: orientation === 'portrait' ? 1200 : 1600,
+          windowWidth: orientation === 'portrait' ? 820 : 1150,
         },
         jsPDF: {
           unit: 'mm',
@@ -267,7 +285,11 @@ export default function CetakPage() {
           compress: true,
           precision: 16,
         },
-        pagebreak: { mode: ['css', 'legacy'] },
+        pagebreak: {
+          mode: ['avoid-all', 'css', 'legacy'],
+          before: ['.html2pdf__page-break', '.print-page-break'],
+          avoid: ['tr', 'thead', '.print-break-avoid', '.pdf-page-container'],
+        },
       };
 
       await html2pdf().set(opt).from(element).save();
@@ -448,7 +470,21 @@ export default function CetakPage() {
                 <span>Berita Acara Rekap (Gambar 2 & 3)</span>
               </button>
 
-              {/* 2. Lampiran List Tidak Hadir (Gambar 4) */}
+              {/* 2. Berita Acara Soft Skill (Gambar 6 & 7) */}
+              <button
+                type="button"
+                onClick={() => setPrintFormat('soft_skill')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  printFormat === 'soft_skill'
+                    ? 'bg-white text-[#0056b3] shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-blue-700" />
+                <span>Berita Acara Soft Skill (Gambar 6 & 7)</span>
+              </button>
+
+              {/* 3. Lampiran List Tidak Hadir (Gambar 4 & 5) */}
               <button
                 type="button"
                 onClick={() => setPrintFormat('list_tidak_hadir')}
@@ -459,10 +495,10 @@ export default function CetakPage() {
                 }`}
               >
                 <Users2 className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Lampiran List Peserta (Gambar 4)</span>
+                <span>Lampiran List Peserta (Gambar 4 & 5)</span>
               </button>
 
-              {/* 3. Grid Horizontal Foto Bukti */}
+              {/* 4. Grid Horizontal Foto Bukti */}
               <button
                 type="button"
                 onClick={() => setPrintFormat('horizontal')}
@@ -476,7 +512,7 @@ export default function CetakPage() {
                 <span>Bukti Foto Horizontal (4 Kolom)</span>
               </button>
 
-              {/* 4. Grid Vertikal Lama */}
+              {/* 5. Grid Vertikal Lama */}
               <button
                 type="button"
                 onClick={() => setPrintFormat('lama')}
@@ -496,6 +532,9 @@ export default function CetakPage() {
             {printFormat === 'rekap_dispensasi' && (
               <span>Sumber Data: <strong className="text-gray-800">Sheet cetak_rekap</strong> ({rekapData.length} baris)</span>
             )}
+            {printFormat === 'soft_skill' && (
+              <span>Sumber Data: <strong className="text-gray-800">Sheet list_soft_skill</strong> ({softSkillData.length} peserta)</span>
+            )}
             {printFormat === 'list_tidak_hadir' && (
               <span>Sumber Data: <strong className="text-gray-800">Sheet list_tidak_hadir</strong> ({listTidakHadirData.length} peserta)</span>
             )}
@@ -509,7 +548,7 @@ export default function CetakPage() {
 
         {/* A. Pengaturan Khusus Berita Acara Rekapitulasi (Gambar 2 & 3) */}
         {printFormat === 'rekap_dispensasi' && (
-          <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs bg-blue-50/40 p-3.5 rounded-xl border border-blue-100">
+          <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs bg-blue-50/40 p-3.5 rounded-xl border border-blue-100">
             {/* Pilihan Mode Tanda Tangan */}
             <div>
               <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
@@ -537,16 +576,29 @@ export default function CetakPage() {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Sudah Ada TTD (Gbr 3)
+                  Ada TTD (Gbr 3)
                 </button>
               </div>
+            </div>
+
+            {/* Warna Tinta TTD */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Warna Tinta TTD</label>
+              <select
+                value={inkColor}
+                onChange={(e) => setInkColor(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              >
+                <option value="#122b52">Biru Bolpoin Resmi</option>
+                <option value="#111827">Hitam Pekat</option>
+              </select>
             </div>
 
             {/* Setting Tanggal Cetak (Bebas Diedit Sesuai Keinginan User) */}
             <div>
               <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-[#0056b3]" />
-                Tanggal Cetak (Bebas Diatur)
+                Tanggal Cetak
               </label>
               <input
                 type="text"
@@ -586,6 +638,95 @@ export default function CetakPage() {
                 type="text"
                 value={tahunCetak}
                 onChange={(e) => setTahunCetak(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* B. Pengaturan Khusus Berita Acara Soft Skill (Gambar 6 & 7) */}
+        {printFormat === 'soft_skill' && (
+          <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs bg-indigo-50/40 p-3.5 rounded-xl border border-indigo-100">
+            {/* Pilihan Mode Tanda Tangan */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+                <PenTool className="w-3.5 h-3.5 text-[#0056b3]" />
+                Versi Tanda Tangan
+              </label>
+              <div className="inline-flex w-full p-1 bg-white rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setSoftSkillTtdMode('kosong')}
+                  className={`flex-1 py-1 text-center font-bold rounded text-xs transition-colors ${
+                    softSkillTtdMode === 'kosong'
+                      ? 'bg-blue-100 text-[#0056b3]'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  TTD Kosong
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSoftSkillTtdMode('ada')}
+                  className={`flex-1 py-1 text-center font-bold rounded text-xs transition-colors ${
+                    softSkillTtdMode === 'ada'
+                      ? 'bg-blue-100 text-[#0056b3]'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Sudah Ada TTD (Gbr 7)
+                </button>
+              </div>
+            </div>
+
+            {/* Warna Tinta TTD */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Warna Tinta TTD</label>
+              <select
+                value={inkColor}
+                onChange={(e) => setInkColor(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              >
+                <option value="#122b52">Biru Bolpoin Resmi</option>
+                <option value="#111827">Hitam Pekat</option>
+              </select>
+            </div>
+
+            {/* Cabang */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Cabang</label>
+              <input
+                type="text"
+                value={softSkillCabang}
+                onChange={(e) => setSoftSkillCabang(e.target.value)}
+                placeholder="Surabaya"
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              />
+            </div>
+
+            {/* Periode Training */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Periode Training</label>
+              <input
+                type="text"
+                value={softSkillPeriode}
+                onChange={(e) => setSoftSkillPeriode(e.target.value)}
+                placeholder="September 2026"
+                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+              />
+            </div>
+
+            {/* Tanggal Dibuat */}
+            <div>
+              <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-[#0056b3]" />
+                Tanggal Dibuat
+              </label>
+              <input
+                type="text"
+                value={softSkillTanggalDibuat}
+                onChange={(e) => setSoftSkillTanggalDibuat(e.target.value)}
+                placeholder="30 September 2026"
                 className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
               />
             </div>
@@ -716,6 +857,7 @@ export default function CetakPage() {
           <BeritaAcaraRekap
             data={rekapData}
             ttdMode={ttdMode}
+            inkColor={inkColor}
             tanggalCetak={tanggalCetak}
             cabang={cabangCetak}
             bulan={bulanCetak}
@@ -725,7 +867,23 @@ export default function CetakPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 2. FORMAT: LAMPIRAN DETAIL PESERTA TIDAK HADIR (GAMBAR 4)                 */}
+      {/* 2. FORMAT: BERITA ACARA SOFT SKILL (GAMBAR 6 & GAMBAR 7)                   */}
+      {/* ========================================================================= */}
+      {printFormat === 'soft_skill' && (
+        <div id="printable-content" className="max-w-4xl mx-auto">
+          <BeritaAcaraSoftSkill
+            data={softSkillData}
+            ttdMode={softSkillTtdMode}
+            inkColor={inkColor}
+            cabang={softSkillCabang}
+            periode={softSkillPeriode}
+            tanggalDibuat={softSkillTanggalDibuat}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. FORMAT: LAMPIRAN DETAIL PESERTA TIDAK HADIR (GAMBAR 4 & GAMBAR 5)       */}
       {/* ========================================================================= */}
       {printFormat === 'list_tidak_hadir' && (
         <div id="printable-content" className="max-w-4xl mx-auto">
@@ -737,7 +895,7 @@ export default function CetakPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 3. FORMAT: GRID HORIZONTAL 4 KOLOM BUKTI FOTO                             */}
+      {/* 4. FORMAT: GRID HORIZONTAL 4 KOLOM BUKTI FOTO                             */}
       {/* ========================================================================= */}
       {printFormat === 'horizontal' && (
         <div id="printable-content" className="space-y-8 print:space-y-0">

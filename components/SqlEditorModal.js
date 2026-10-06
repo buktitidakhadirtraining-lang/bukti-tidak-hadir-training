@@ -77,7 +77,23 @@ create table if not exists cetak_list_tidak_hadir (
   updated_at timestamptz default now() not null
 );
 
--- 5. TRIGGER: Otomatis mencatat data baru dari absence_records ke data_tambahan
+-- 5. TABEL: list_soft_skill (Sesuai Sheet list_soft_skill Google Sheets)
+-- Header: NIK, Nama, Jabatan, Kategory, Detail Alasan
+-- Otomatis ditarik & disinkronisasi setiap 10 detik dari spreadsheet
+create table if not exists list_soft_skill (
+  id uuid primary key default gen_random_uuid(),
+  no int,
+  nik text not null,
+  nama text not null,
+  jabatan text default '',
+  kategory text default '',
+  detail_alasan text default '',
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+create index if not exists idx_list_soft_skill_nik on list_soft_skill (nik);
+
+-- 6. TRIGGER: Otomatis mencatat data baru dari absence_records ke data_tambahan
 create or replace function fn_auto_record_to_data_tambahan()
 returns trigger as $$
 declare
@@ -109,29 +125,60 @@ after insert on absence_records
 for each row
 execute function fn_auto_record_to_data_tambahan();
 
--- 6. Hak Akses RLS
+-- 7. Hak Akses RLS
 alter table cetak_rekap enable row level security;
 alter table list_tidak_hadir enable row level security;
 alter table data_tambahan enable row level security;
 alter table cetak_list_tidak_hadir enable row level security;
+alter table list_soft_skill enable row level security;
 
 create policy "Full access cetak_rekap" on cetak_rekap for all using (true) with check (true);
 create policy "Full access list_tidak_hadir" on list_tidak_hadir for all using (true) with check (true);
 create policy "Full access data_tambahan" on data_tambahan for all using (true) with check (true);
 create policy "Full access cetak_list_tidak_hadir" on cetak_list_tidak_hadir for all using (true) with check (true);
+create policy "Full access list_soft_skill" on list_soft_skill for all using (true) with check (true);
+
+notify pgrst, 'reload schema';`;
+
+const SQL_ONLY_SOFT_SKILL = `-- ==============================================================================
+-- KODE SQL EDITOR KHUSUS TABEL: list_soft_skill
+-- ==============================================================================
+-- Header: NIK | Nama | Jabatan | Kategory | Detail Alasan
+create table if not exists list_soft_skill (
+  id uuid primary key default gen_random_uuid(),
+  no int,
+  nik text not null,
+  nama text not null,
+  jabatan text default '',
+  kategory text default '',
+  detail_alasan text default '',
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
+create index if not exists idx_list_soft_skill_nik on list_soft_skill (nik);
+alter table list_soft_skill enable row level security;
+create policy "Full access list_soft_skill" on list_soft_skill for all using (true) with check (true);
 
 notify pgrst, 'reload schema';`;
 
 export default function SqlEditorModal({ isOpen, onClose }) {
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'soft_skill'
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
+  const currentSql = activeTab === 'soft_skill' ? SQL_ONLY_SOFT_SKILL : SQL_SCRIPT;
+
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(SQL_SCRIPT);
+      await navigator.clipboard.writeText(currentSql);
       setCopied(true);
-      toast.success('Kode SQL berhasil disalin ke clipboard!');
+      toast.success(
+        activeTab === 'soft_skill'
+          ? 'Kode SQL list_soft_skill berhasil disalin!'
+          : 'Kode SQL seluruh tabel berhasil disalin!'
+      );
       setTimeout(() => setCopied(false), 2500);
     } catch {
       toast.error('Gagal menyalin teks');
@@ -152,7 +199,7 @@ export default function SqlEditorModal({ isOpen, onClose }) {
                 SQL Editor Supabase (Sheet Sync & Rekap)
               </h2>
               <p className="text-xs text-gray-500">
-                Skrip SQL untuk membuat tabel cetak_rekap, list_tidak_hadir, data_tambahan, dan cetak_list_tidak_hadir
+                Skrip SQL untuk membuat tabel cetak_rekap, list_tidak_hadir, data_tambahan, cetak_list_tidak_hadir, dan list_soft_skill
               </p>
             </div>
           </div>
@@ -173,10 +220,10 @@ export default function SqlEditorModal({ isOpen, onClose }) {
               Sistem Sinkronisasi Live Time (10 Detik):
             </p>
             <p>
-              1. <strong>Tabel cetak_rekap & list_tidak_hadir</strong> otomatis ditarik dari Google Spreadsheet setiap 10 detik oleh sistem backend dan diperbarui ke Supabase.
+              1. <strong>Tabel cetak_rekap, list_tidak_hadir, & list_soft_skill</strong> otomatis ditarik dari Google Spreadsheet setiap 10 detik oleh sistem backend dan diperbarui ke Supabase.
             </p>
             <p>
-              2. <strong>Tabel Data_tambahan</strong> tidak ditarik dari spreadsheet, tetapi jika ada data baru masuk ke database Supabase, sistem akan otomatis mencatatnya secara live ke tabel <code>data_tambahan</code> via Trigger.
+              2. <strong>Tabel Data_tambahan</strong> otomatis mencatat setiap data tambahan baru yang diinput via website ke Supabase & Google Spreadsheet.
             </p>
             <div className="pt-1">
               <a
@@ -192,8 +239,33 @@ export default function SqlEditorModal({ isOpen, onClose }) {
           </div>
 
           <div>
+            {/* Tabs Pemilihan Skrip */}
             <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-gray-700">Kode SQL untuk Dijalankan di Supabase SQL Editor:</span>
+              <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('all')}
+                  className={`px-3 py-1 rounded-md font-bold text-xs transition-colors ${
+                    activeTab === 'all'
+                      ? 'bg-white text-[#0056b3] shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Semua Tabel (Lengkap)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('soft_skill')}
+                  className={`px-3 py-1 rounded-md font-bold text-xs transition-colors ${
+                    activeTab === 'soft_skill'
+                      ? 'bg-white text-[#0056b3] shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Khusus list_soft_skill
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={handleCopy}
@@ -205,7 +277,7 @@ export default function SqlEditorModal({ isOpen, onClose }) {
             </div>
 
             <pre className="p-4 bg-gray-900 text-gray-100 rounded-xl font-mono text-[11px] overflow-x-auto max-h-[340px] leading-relaxed border border-gray-800">
-              {SQL_SCRIPT}
+              {currentSql}
             </pre>
           </div>
         </div>
@@ -225,7 +297,7 @@ export default function SqlEditorModal({ isOpen, onClose }) {
             className="flex items-center gap-1.5 px-4 py-2 bg-[#0056b3] hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-xs transition-colors"
           >
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? 'Tersalin ke Clipboard' : 'Salin Seluruh SQL'}</span>
+            <span>{copied ? 'Tersalin ke Clipboard' : 'Salin Kode SQL Ini'}</span>
           </button>
         </div>
       </div>

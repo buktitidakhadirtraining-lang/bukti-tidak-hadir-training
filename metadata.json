@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Sistem Ketidakhadiran Peserta Training Indomaret",
+  "description": "Sistem manajemen dan cetak dokumen rekapitulasi ketidakhadiran peserta training Indomaret, berita acara dispensasi, lampiran detail peserta, berita acara soft skill, dan sinkronisasi live spreadsheet.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

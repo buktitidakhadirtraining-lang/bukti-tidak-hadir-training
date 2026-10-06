@@ -24,9 +24,10 @@ export async function GET(request) {
     const supabase = getSupabaseAdmin();
 
     // Ambil data terkini dari tabel Supabase
-    const [rekapRes, listRes, tambahanRes] = await Promise.all([
+    const [rekapRes, listRes, softSkillRes, tambahanRes] = await Promise.all([
       supabase.from('cetak_rekap').select('*').order('no', { ascending: true }),
       supabase.from('list_tidak_hadir').select('*').order('no', { ascending: true }),
+      supabase.from('list_soft_skill').select('*').order('no', { ascending: true }),
       supabase.from('data_tambahan').select('*').order('no', { ascending: true }).limit(200),
     ]);
 
@@ -36,6 +37,7 @@ export async function GET(request) {
       lastSyncTime: new Date(lastSyncTime).toISOString(),
       rekap: rekapRes.data || [],
       listTidakHadir: listRes.data || [],
+      softSkill: softSkillRes.data || [],
       dataTambahan: tambahanRes.data || [],
     });
   } catch (err) {
@@ -54,9 +56,10 @@ export async function POST() {
     cachedSyncResult = result;
 
     const supabase = getSupabaseAdmin();
-    const [rekapRes, listRes] = await Promise.all([
+    const [rekapRes, listRes, softSkillRes] = await Promise.all([
       supabase.from('cetak_rekap').select('*').order('no', { ascending: true }),
       supabase.from('list_tidak_hadir').select('*').order('no', { ascending: true }),
+      supabase.from('list_soft_skill').select('*').order('no', { ascending: true }),
     ]);
 
     return NextResponse.json({
@@ -64,6 +67,7 @@ export async function POST() {
       syncInfo: result,
       rekap: rekapRes.data || [],
       listTidakHadir: listRes.data || [],
+      softSkill: softSkillRes.data || [],
     });
   } catch (err) {
     console.error('[API Sync Sheets POST Error]:', err);

@@ -52,4 +52,31 @@ h1, h2, h3, h4, h5, h6 {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  table {
+    page-break-inside: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+}
+
+/* Explicit html2pdf page break element */
+.html2pdf__page-break {
+  page-break-before: always !important;
+  break-before: page !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+}
+
+.pdf-page-container {
+  box-sizing: border-box;
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
