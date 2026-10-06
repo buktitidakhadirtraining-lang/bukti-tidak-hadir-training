@@ -2,75 +2,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Copy, Check, X, Database, Sparkles, AlertCircle } from 'lucide-react';
+import { Copy, Check, X, Database, Sparkles, AlertCircle, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
 const SQL_MIGRATION_ADD_BRANCH_ID = `-- ==============================================================================
--- SKRIP MIGRASI CEPAT: TAMBAH KOLOM branch_id & created_by
+-- SKRIP MIGRASI & PERBAIKAN HAK AKSES SUPABASE (JALANKAN DI SQL EDITOR)
 -- ==============================================================================
--- Jalankan skrip ini di SQL Editor Supabase untuk mengaktifkan isolasi data per cabang:
-
-ALTER TABLE data_tambahan ADD COLUMN IF NOT EXISTS branch_id text;
-ALTER TABLE data_tambahan ADD COLUMN IF NOT EXISTS created_by text;
-
-ALTER TABLE list_tidak_hadir ADD COLUMN IF NOT EXISTS branch_id text;
-ALTER TABLE list_tidak_hadir ADD COLUMN IF NOT EXISTS created_by text;
-
-ALTER TABLE cetak_list_tidak_hadir ADD COLUMN IF NOT EXISTS branch_id text;
-ALTER TABLE cetak_list_tidak_hadir ADD COLUMN IF NOT EXISTS created_by text;
-ALTER TABLE cetak_list_tidak_hadir ADD COLUMN IF NOT EXISTS source_type text DEFAULT 'list_tidak_hadir';
-
-ALTER TABLE cetak_rekap ADD COLUMN IF NOT EXISTS branch_id text;
-ALTER TABLE list_soft_skill ADD COLUMN IF NOT EXISTS branch_id text;
-
-CREATE INDEX IF NOT EXISTS idx_data_tambahan_branch ON data_tambahan(branch_id);
-CREATE INDEX IF NOT EXISTS idx_list_tidak_hadir_branch ON list_tidak_hadir(branch_id);
-CREATE INDEX IF NOT EXISTS idx_cetak_list_tidak_hadir_branch ON cetak_list_tidak_hadir(branch_id);
-
-NOTIFY pgrst, 'reload schema';`;
-
-const SQL_SCRIPT = `-- ==============================================================================
--- SCHEMA SQL LENGKAP: TABEL DATA KETIDAKHADIRAN & CETAK BUKTI PDF
--- ==============================================================================
--- Mendukung isolasi data multi-cabang (Setiap Admin Cabang hanya melihat data cabangnya)
-
--- 1. TABEL: cetak_rekap
-create table if not exists cetak_rekap (
-  id uuid primary key default gen_random_uuid(),
-  no int,
-  jenis_training text not null,
-  target_lskt text default '0',
-  dispensasi text default '0',
-  target_tc_report text default '',
-  hadir text default '',
-  tidak_hadir text default '',
-  no_list_peserta_tidak_hadir text default '',
-  branch_id text,
-  created_at timestamptz default now() not null,
-  updated_at timestamptz default now() not null
-);
-create index if not exists idx_cetak_rekap_branch on cetak_rekap (branch_id);
-
--- 2. TABEL: list_tidak_hadir (Menu: List Tidak Hadir Training)
-create table if not exists list_tidak_hadir (
-  id uuid primary key default gen_random_uuid(),
-  no int,
-  training text not null,
-  nik text not null,
-  nama text not null,
-  kd_toko text,
-  nama_toko text,
-  alasan_tidak_hadir text,
-  branch_id text,
-  created_by text,
-  created_at timestamptz default now() not null,
-  updated_at timestamptz default now() not null
-);
-create index if not exists idx_list_tidak_hadir_branch on list_tidak_hadir (branch_id);
-create index if not exists idx_list_tidak_hadir_training on list_tidak_hadir (training);
-create index if not exists idx_list_tidak_hadir_nik on list_tidak_hadir (nik);
-
--- 3. TABEL: data_tambahan (Menu: Input Data Tambahan)
+-- 1. Buat tabel jika belum ada
 create table if not exists data_tambahan (
   id uuid primary key default gen_random_uuid(),
   no int,
@@ -85,10 +23,22 @@ create table if not exists data_tambahan (
   created_at timestamptz default now() not null,
   updated_at timestamptz default now() not null
 );
-create index if not exists idx_data_tambahan_branch on data_tambahan (branch_id);
-create index if not exists idx_data_tambahan_nik on data_tambahan (nik);
 
--- 4. TABEL: cetak_list_tidak_hadir (Gabungan Data_tambahan + List_tidak_hadir)
+create table if not exists list_tidak_hadir (
+  id uuid primary key default gen_random_uuid(),
+  no int,
+  training text not null,
+  nik text not null,
+  nama text not null,
+  kd_toko text,
+  nama_toko text,
+  alasan_tidak_hadir text,
+  branch_id text,
+  created_by text,
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
 create table if not exists cetak_list_tidak_hadir (
   id text primary key,
   no int,
@@ -104,56 +54,67 @@ create table if not exists cetak_list_tidak_hadir (
   created_at timestamptz default now() not null,
   updated_at timestamptz default now() not null
 );
-create index if not exists idx_cetak_list_tidak_hadir_branch on cetak_list_tidak_hadir (branch_id);
 
--- 5. TABEL: list_soft_skill
-create table if not exists list_soft_skill (
+create table if not exists cetak_rekap (
   id uuid primary key default gen_random_uuid(),
   no int,
-  nik text not null,
-  nama text not null,
-  jabatan text default '',
-  kategory text default '',
-  detail_alasan text default '',
+  jenis_training text not null,
+  target_lskt text default '0',
+  dispensasi text default '0',
+  target_tc_report text default '',
+  hadir text default '',
+  tidak_hadir text default '',
+  no_list_peserta_tidak_hadir text default '',
   branch_id text,
   created_at timestamptz default now() not null,
   updated_at timestamptz default now() not null
 );
-create index if not exists idx_list_soft_skill_branch on list_soft_skill (branch_id);
-create index if not exists idx_list_soft_skill_nik on list_soft_skill (nik);
 
--- 6. Hak Akses RLS
-alter table cetak_rekap enable row level security;
-alter table list_tidak_hadir enable row level security;
-alter table data_tambahan enable row level security;
-alter table cetak_list_tidak_hadir enable row level security;
-alter table list_soft_skill enable row level security;
+-- 2. Pastikan kolom branch_id & created_by ada pada semua tabel
+alter table data_tambahan add column if not exists branch_id text;
+alter table data_tambahan add column if not exists created_by text;
+alter table data_tambahan add column if not exists no int;
+alter table data_tambahan add column if not exists kd_toko text;
+alter table data_tambahan add column if not exists nama_toko text;
+alter table data_tambahan add column if not exists alasan_tidak_hadir text;
 
-create policy "Full access cetak_rekap" on cetak_rekap for all using (true) with check (true);
-create policy "Full access list_tidak_hadir" on list_tidak_hadir for all using (true) with check (true);
-create policy "Full access data_tambahan" on data_tambahan for all using (true) with check (true);
-create policy "Full access cetak_list_tidak_hadir" on cetak_list_tidak_hadir for all using (true) with check (true);
-create policy "Full access list_soft_skill" on list_soft_skill for all using (true) with check (true);
+alter table list_tidak_hadir add column if not exists branch_id text;
+alter table list_tidak_hadir add column if not exists created_by text;
+alter table list_tidak_hadir add column if not exists no int;
+alter table list_tidak_hadir add column if not exists kd_toko text;
+alter table list_tidak_hadir add column if not exists nama_toko text;
+alter table list_tidak_hadir add column if not exists alasan_tidak_hadir text;
 
+alter table cetak_list_tidak_hadir add column if not exists branch_id text;
+alter table cetak_list_tidak_hadir add column if not exists created_by text;
+alter table cetak_list_tidak_hadir add column if not exists source_type text default 'list_tidak_hadir';
+
+alter table cetak_rekap add column if not exists branch_id text;
+
+-- 3. Matikan RLS agar Anon Key & Service Role bisa menyimpan data tanpa diblokir
+alter table if exists data_tambahan disable row level security;
+alter table if exists list_tidak_hadir disable row level security;
+alter table if exists cetak_list_tidak_hadir disable row level security;
+alter table if exists cetak_rekap disable row level security;
+alter table if exists list_soft_skill disable row level security;
+
+-- 4. Berikan izin penuh ke anon, authenticated, dan service_role
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+
+-- 5. Reload Schema PostgREST
 notify pgrst, 'reload schema';`;
 
 export default function SqlEditorModal({ isOpen, onClose }) {
-  const [activeTab, setActiveTab] = useState('migration'); // 'migration' | 'full'
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
-  const currentSql = activeTab === 'migration' ? SQL_MIGRATION_ADD_BRANCH_ID : SQL_SCRIPT;
-
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(currentSql);
+      await navigator.clipboard.writeText(SQL_MIGRATION_ADD_BRANCH_ID);
       setCopied(true);
-      toast.success(
-        activeTab === 'migration'
-          ? 'Skrip migrasi tambah kolom branch_id berhasil disalin!'
-          : 'Kode SQL seluruh tabel berhasil disalin!'
-      );
+      toast.success('Kode SQL Supabase berhasil disalin!');
       setTimeout(() => setCopied(false), 2500);
     } catch {
       toast.error('Gagal menyalin teks');
@@ -171,15 +132,15 @@ export default function SqlEditorModal({ isOpen, onClose }) {
             </div>
             <div>
               <h2 className="text-base font-bold text-gray-900 font-title">
-                SQL Editor Supabase (Migrasi Kolom Cabang)
+                Skrip SQL Supabase (Struktur Tabel & Izin Akses)
               </h2>
               <p className="text-xs text-gray-500">
-                Skrip SQL untuk mengaktifkan kolom <strong>branch_id</strong> dan isolasi data per cabang
+                Jalankan skrip ini sekali di <strong>SQL Editor Dashboard Supabase</strong> Anda.
               </p>
             </div>
           </div>
+
           <button
-            type="button"
             onClick={onClose}
             className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -187,84 +148,74 @@ export default function SqlEditorModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Info Petunjuk */}
-        <div className="p-5 overflow-y-auto space-y-4 text-xs">
-          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 space-y-1.5 leading-relaxed">
-            <p className="font-bold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-700" />
-              Petunjuk Mengatasi Notifikasi &quot;column branch_id does not exist&quot;:
-            </p>
-            <p>
-              1. Buka <strong>SQL Editor</strong> di dashboard Supabase Anda.
-            </p>
-            <p>
-              2. Salin skrip <strong>Migrasi Tambah Kolom (ALTER TABLE)</strong> di bawah ini, tempel di SQL Editor Supabase, lalu klik tombol <strong>RUN</strong>.
-            </p>
-            <p>
-              3. Setelah dijalankan, seluruh tabel Anda akan memiliki kolom <code>branch_id</code> dan data antar-cabang akan terpisah 100% secara otomatis.
-            </p>
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-4 text-xs">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-amber-900">
+                Mengapa data belum masuk ke Supabase?
+              </p>
+              <p className="text-amber-800 leading-relaxed text-[11px]">
+                Jika tabel belum dibuat di Supabase atau fitur <strong>Row Level Security (RLS)</strong> masih mengunci akses, jalankan skrip di bawah ini di <strong>Dashboard Supabase &gt; SQL Editor &gt; New Query &gt; Run</strong>.
+              </p>
+            </div>
           </div>
 
-          <div>
-            {/* Tabs Pemilihan Skrip */}
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex bg-gray-100 p-1 rounded-xl gap-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('migration')}
-                  className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 ${
-                    activeTab === 'migration'
-                      ? 'bg-white text-[#0056b3] shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Migrasi Cepat (Tambah Kolom)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('full')}
-                  className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
-                    activeTab === 'full'
-                      ? 'bg-white text-[#0056b3] shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <span>Skrip Lengkap (Semua Tabel)</span>
-                </button>
-              </div>
-
+          <div className="relative">
+            <div className="flex items-center justify-between bg-gray-800 text-gray-300 px-4 py-2 rounded-t-xl text-[11px] font-mono">
+              <span>supabase_setup_script.sql</span>
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0056b3] hover:bg-blue-700 text-white rounded-lg font-bold text-xs transition-colors shadow-xs"
+                className="flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors"
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Tersalin!' : 'Salin Kode SQL'}</span>
+                <span>{copied ? 'Tersalin!' : 'Salin Semua SQL'}</span>
               </button>
             </div>
+            <pre className="p-4 bg-gray-900 text-green-400 rounded-b-xl overflow-x-auto text-xs font-mono max-h-72 leading-relaxed selection:bg-blue-500 selection:text-white">
+              {SQL_MIGRATION_ADD_BRANCH_ID}
+            </pre>
+          </div>
 
-            {/* Code Block */}
-            <div className="relative rounded-xl overflow-hidden border border-gray-800 bg-[#1e1e1e]">
-              <pre className="p-4 text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-72 leading-relaxed">
-                <code>{currentSql}</code>
-              </pre>
-            </div>
+          <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-2 text-blue-950">
+            <p className="font-bold flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              Langkah Singkat Menjalankan Skrip:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-[11px] text-blue-900">
+              <li>Klik tombol <strong>"Salin Semua SQL"</strong> di atas.</li>
+              <li>Buka proyek Supabase Anda di browser (<a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-bold text-blue-700">supabase.com/dashboard</a>).</li>
+              <li>Pilih menu <strong>SQL Editor</strong> di bilah navigasi kiri &gt; Klik <strong>New Query</strong>.</li>
+              <li>Tempel (Paste) kode SQL tersebut lalu klik <strong>Run</strong>.</li>
+              <li>Selesai! Seluruh data input akan langsung masuk ke database Supabase Anda.</li>
+            </ol>
           </div>
         </div>
 
         {/* Footer */}
         <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
           <p className="text-[11px] text-gray-500">
-            Sistem otomatis beradaptasi (Auto-fallback) agar aplikasi tetap berjalan normal saat proses migrasi.
+            Skrip ini aman dijalankan berulang kali (Idempotent).
           </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold text-xs transition-colors"
-          >
-            Tutup
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#0056b3] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              <span>{copied ? 'Sudah Tersalin' : 'Salin Skrip SQL'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-colors"
+            >
+              Tutup
+            </button>
+          </div>
         </div>
       </div>
     </div>
