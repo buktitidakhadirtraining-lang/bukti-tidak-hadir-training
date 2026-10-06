@@ -21,6 +21,8 @@ import { MASTER_TRAININGS_LIST } from '../../../lib/trainings-master.js';
 import EditDataTambahanModal from '../../../components/EditDataTambahanModal.js';
 import ImportExportModal from '../../../components/ImportExportModal.js';
 import ConfirmDialog from '../../../components/ConfirmDialog.js';
+import SqlEditorModal from '../../../components/SqlEditorModal.js';
+import { Database } from 'lucide-react';
 
 export default function ListTidakHadirPage() {
   const [training, setTraining] = useState('YFC');
@@ -39,6 +41,7 @@ export default function ListTidakHadirPage() {
 
   // Modals
   const [showImportExportModal, setShowImportExportModal] = useState(false);
+  const [showSqlModal, setShowSqlModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [deleteSingleDialog, setDeleteSingleDialog] = useState({
     isOpen: false,
@@ -225,6 +228,16 @@ export default function ListTidakHadirPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowSqlModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all border border-gray-300 shadow-xs"
+              title="Lihat skrip SQL Supabase"
+            >
+              <Database className="w-4 h-4 text-[#0056b3]" />
+              <span>Skrip SQL Supabase</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowImportExportModal(true)}
@@ -536,6 +549,12 @@ export default function ListTidakHadirPage() {
         isLoading={deleteAllDialog.loading}
         onConfirm={confirmDeleteAll}
         onCancel={() => setDeleteAllDialog({ isOpen: false, loading: false })}
+      />
+
+      {/* Modal Skrip SQL Supabase */}
+      <SqlEditorModal
+        isOpen={showSqlModal}
+        onClose={() => setShowSqlModal(false)}
       />
     </div>
   );
