@@ -29,15 +29,18 @@ import LampiranListTidakHadir from '../../../components/LampiranListTidakHadir.j
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 
 // Komponen gambar bukti yang tajam dan aman
-function ProofImage({ recordId, src, alt, onLoaded }) {
+function ProofImage({ recordId, src, alt, onLoaded, isSingleRow = false }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt={alt}
       crossOrigin="anonymous"
-      className="max-h-[175px] max-w-full w-auto h-auto object-contain mx-auto"
+      className="max-h-full max-w-full w-auto h-auto object-contain mx-auto"
       style={{
+        maxHeight: isSingleRow ? '118mm' : '52mm',
+        maxWidth: '100%',
+        objectFit: 'contain',
         imageRendering: 'auto',
         WebkitPrintColorAdjust: 'exact',
       }}
@@ -718,6 +721,8 @@ export default function CetakPage() {
           allowTaint: true,
           backgroundColor: '#ffffff',
           logging: false,
+          width: sheet.offsetWidth,
+          height: sheet.offsetHeight,
           windowWidth: windowWidthPx,
         });
 
@@ -727,7 +732,22 @@ export default function CetakPage() {
           doc.addPage('a4', orientation);
         }
 
-        doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        // Pertahankan rasio asli (aspect ratio) persis agar tidak gepeng/stretched
+        const canvasAspect = canvas.height / canvas.width;
+        let drawWidth = pdfWidth;
+        let drawHeight = pdfWidth * canvasAspect;
+        let x = 0;
+        let y = 0;
+
+        if (drawHeight > pdfHeight) {
+          drawHeight = pdfHeight;
+          drawWidth = pdfHeight / canvasAspect;
+          x = (pdfWidth - drawWidth) / 2;
+        } else {
+          y = (pdfHeight - drawHeight) / 2;
+        }
+
+        doc.addImage(imgData, 'JPEG', x, y, drawWidth, drawHeight);
       }
 
       let filename = printFormat === 'horizontal'
@@ -1341,124 +1361,174 @@ export default function CetakPage() {
       {/* ========================================================================= */}
       {printFormat === 'horizontal' && (
         <div id="printable-content" className="space-y-8 print:space-y-0">
+          <style jsx global>{`
+            @page {
+              size: A4 landscape !important;
+              margin: 0 !important;
+            }
+          `}</style>
           {trainingGroups.length > 0 ? (
-            trainingGroups.map((group, groupIdx) => {
-              const chunks = chunkArray(group.records, 4);
+            trainingGroups.flatMap((group, groupIdx) => {
+              // Bagi records per grup menjadi per lembar/halaman (maksimal 8 peserta per lembar: 2 baris x 4 kolom)
+              const pages = chunkArray(group.records, 8);
+              const totalPages = pages.length;
 
-              return (
-                <div
-                  key={group.id}
-                  className={`sheet landscape ${
-                    groupIdx === trainingGroups.length - 1 ? 'last-sheet' : ''
-                  }`}
-                >
-                  <div className="overflow-x-auto">
-                    <table
-                      className="w-full text-left text-xs"
-                      style={{
-                        borderCollapse: 'collapse',
-                        border: '1px solid #000000',
-                      }}
-                    >
-                      <thead>
-                        <tr>
-                          <th
-                            colSpan={8}
-                            className="text-center font-black uppercase text-sm sm:text-base p-2 font-title tracking-wider text-black"
-                            style={{ border: '1px solid #000000', backgroundColor: '#F3F4F6' }}
-                          >
-                            LAMPIRAN BUKTI TIDAK HADIR
-                          </th>
-                        </tr>
-                        <tr>
-                          <th
-                            colSpan={8}
-                            className="text-center font-bold uppercase text-xs sm:text-sm p-1.5 font-title tracking-wide text-black"
-                            style={{ border: '1px solid #000000', backgroundColor: '#F9FAFB' }}
-                          >
-                            {group.name}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {chunks.map((chunk, chunkIdx) => {
-                          const padded = [...chunk];
-                          while (padded.length < 4) {
-                            padded.push(null);
-                          }
+              return pages.map((pageRecords, pageIdx) => {
+                // Bagi records lembar ini menjadi baris-baris (maksimal 4 peserta per baris)
+                const rows = chunkArray(pageRecords, 4);
+                const isSingleRow = rows.length === 1;
 
-                          return (
-                            <React.Fragment key={chunkIdx}>
-                              <tr className="print-break-avoid" style={{ backgroundColor: '#ffffff' }}>
-                                {padded.map((item, idx) => (
-                                  <React.Fragment key={`id-${chunkIdx}-${idx}`}>
+                return (
+                  <div
+                    key={`${group.id}-page-${pageIdx}`}
+                    className={`sheet landscape ${
+                      groupIdx === trainingGroups.length - 1 && pageIdx === totalPages - 1 ? 'last-sheet' : ''
+                    }`}
+                  >
+                    <div className="w-full h-full flex flex-col justify-start">
+                      <table
+                        className="w-full text-left text-xs table-fixed"
+                        style={{
+                          borderCollapse: 'collapse',
+                          border: '1px solid #000000',
+                          tableLayout: 'fixed',
+                          width: '100%',
+                        }}
+                      >
+                        <colgroup>
+                          <col style={{ width: '25%' }} />
+                          <col style={{ width: '25%' }} />
+                          <col style={{ width: '25%' }} />
+                          <col style={{ width: '25%' }} />
+                        </colgroup>
+                        <thead>
+                          <tr>
+                            <th
+                              colSpan={4}
+                              className="text-center font-black uppercase text-sm sm:text-base font-title tracking-wider text-black py-2.5 px-3"
+                              style={{
+                                border: '1px solid #000000',
+                                backgroundColor: '#F3F4F6',
+                                minHeight: '10mm',
+                              }}
+                            >
+                              LAMPIRAN BUKTI TIDAK HADIR
+                            </th>
+                          </tr>
+                          <tr>
+                            <th
+                              colSpan={4}
+                              className="text-center font-bold uppercase text-xs sm:text-sm font-title tracking-wide text-black py-2 px-3"
+                              style={{
+                                border: '1px solid #000000',
+                                backgroundColor: '#F9FAFB',
+                              }}
+                            >
+                              {group.name} {totalPages > 1 ? `(Lembar ${pageIdx + 1} dari ${totalPages})` : ''}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((rowChunk, rowIdx) => {
+                            const padded = [...rowChunk];
+                            while (padded.length < 4) {
+                              padded.push(null);
+                            }
+
+                            return (
+                              <React.Fragment key={`row-${pageIdx}-${rowIdx}`}>
+                                {/* Baris 1: NIK & Nama Peserta (2 baris teks, padding minimal 2mm, tinggi otomatis menyesuaikan teks) */}
+                                <tr className="print-break-avoid" style={{ backgroundColor: '#ffffff' }}>
+                                  {padded.map((item, colIdx) => (
                                     <td
-                                      className="p-1 text-center font-mono font-bold text-[10px] sm:text-[11px] text-black"
-                                      style={{ border: '1px solid #000000', width: '11%' }}
+                                      key={`hdr-${pageIdx}-${rowIdx}-${colIdx}`}
+                                      className="text-center align-middle"
+                                      style={{
+                                        border: '1px solid #000000',
+                                        width: '25%',
+                                        padding: '6px 8px',
+                                        backgroundColor: '#ffffff',
+                                        verticalAlign: 'middle',
+                                      }}
                                     >
-                                      {item ? item.nik : ''}
+                                      {item ? (
+                                        <div className="flex flex-col items-center justify-center min-h-[38px]">
+                                          <span className="font-mono font-bold text-[11px] sm:text-xs text-black tracking-wide leading-tight">
+                                            {item.nik || '-'}
+                                          </span>
+                                          <span className="font-bold text-[11px] sm:text-xs text-gray-900 mt-1 leading-snug break-words max-w-full text-center">
+                                            {item.nama_peserta || '-'}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div className="min-h-[38px]">&nbsp;</div>
+                                      )}
                                     </td>
-                                    <td
-                                      className="p-1 font-semibold text-[10px] sm:text-[11px] text-gray-900 truncate"
-                                      style={{ border: '1px solid #000000', width: '14%' }}
-                                      title={item ? item.nama_peserta : ''}
-                                    >
-                                      {item ? item.nama_peserta : ''}
-                                    </td>
-                                  </React.Fragment>
-                                ))}
-                              </tr>
+                                  ))}
+                                </tr>
 
-                              <tr className="print-break-avoid" style={{ backgroundColor: '#ffffff' }}>
-                                {padded.map((item, idx) => (
-                                  <td
-                                    key={`img-${chunkIdx}-${idx}`}
-                                    colSpan={2}
-                                    className="p-1 text-center align-middle"
-                                    style={{
-                                      border: '1px solid #000000',
-                                      width: '25%',
-                                      height: '175px',
-                                      minHeight: '175px',
-                                      maxHeight: '185px',
-                                    }}
-                                  >
-                                    {!item ? (
-                                      <div className="h-[168px] w-full" />
-                                    ) : !item.drive_file_id ? (
-                                      <div className="h-[168px] w-full flex flex-col items-center justify-center text-gray-400 italic text-[11px]">
-                                        Tidak ada bukti
+                                {/* Baris 2: Foto Bukti Pelatihan (Contain, Aspect Ratio terjaga, tinggi proporsional seragam) */}
+                                <tr className="print-break-avoid" style={{ backgroundColor: '#fafafa' }}>
+                                  {padded.map((item, colIdx) => (
+                                    <td
+                                      key={`img-${pageIdx}-${rowIdx}-${colIdx}`}
+                                      className="text-center align-middle"
+                                      style={{
+                                        border: '1px solid #000000',
+                                        width: '25%',
+                                        height: isSingleRow ? '125mm' : '58mm',
+                                        minHeight: isSingleRow ? '125mm' : '58mm',
+                                        maxHeight: isSingleRow ? '125mm' : '58mm',
+                                        padding: '4px',
+                                        backgroundColor: '#fafafa',
+                                        verticalAlign: 'middle',
+                                      }}
+                                    >
+                                      <div
+                                        className="w-full h-full flex items-center justify-center overflow-hidden rounded bg-white"
+                                        style={{
+                                          height: isSingleRow ? '122mm' : '55mm',
+                                          maxHeight: isSingleRow ? '122mm' : '55mm',
+                                          padding: '3px',
+                                        }}
+                                      >
+                                        {!item ? (
+                                          <div className="w-full h-full" />
+                                        ) : !item.drive_file_id ? (
+                                          <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 italic text-[11px]">
+                                            Tidak ada bukti
+                                          </div>
+                                        ) : item.file_mime_type === 'application/pdf' ? (
+                                          <div className="w-full h-full flex flex-col items-center justify-center p-2 text-gray-700 bg-gray-50/90 rounded">
+                                            <FileText className="w-8 h-8 text-red-500 mb-1" />
+                                            <span className="text-[11px] font-bold text-center leading-tight text-gray-800">
+                                              Dokumen PDF
+                                              <br />
+                                              <span className="font-normal text-gray-500 text-[10px]">(tersimpan di Drive)</span>
+                                            </span>
+                                          </div>
+                                        ) : (
+                                          <ProofImage
+                                            recordId={item.id}
+                                            src={`/api/records/${item.id}/file`}
+                                            alt={`Bukti ${item.nama_peserta}`}
+                                            onLoaded={handleImageLoaded}
+                                            isSingleRow={isSingleRow}
+                                          />
+                                        )}
                                       </div>
-                                    ) : item.file_mime_type === 'application/pdf' ? (
-                                      <div className="h-[168px] w-full flex flex-col items-center justify-center p-2 text-gray-700 bg-gray-50/60 rounded">
-                                        <FileText className="w-8 h-8 text-red-500 mb-1" />
-                                        <span className="text-[10px] font-bold text-center leading-tight">
-                                          Dokumen PDF
-                                          <br />
-                                          <span className="font-normal text-gray-500">(lihat di sistem)</span>
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <div className="h-[168px] w-full flex items-center justify-center overflow-hidden">
-                                        <ProofImage
-                                          recordId={item.id}
-                                          src={`/api/records/${item.id}/file`}
-                                          alt={`Bukti ${item.nama_peserta}`}
-                                          onLoaded={handleImageLoaded}
-                                        />
-                                      </div>
-                                    )}
-                                  </td>
-                                ))}
-                              </tr>
-                            </React.Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                    </td>
+                                  ))}
+                                </tr>
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              );
+                );
+              });
             })
           ) : (
             <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center text-gray-500 italic max-w-6xl mx-auto">
