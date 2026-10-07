@@ -18,6 +18,7 @@ import {
   KeyRound,
   LogOut,
   Info,
+  Database,
   X,
 } from 'lucide-react';
 import { LOGO_URL, APP_NAME } from '../lib/config.js';
