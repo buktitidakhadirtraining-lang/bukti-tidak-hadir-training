@@ -35,6 +35,7 @@ export default function Sidebar({
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/input', label: 'Input Data', icon: PlusCircle },
     { href: '/input-tambahan', label: 'Input Data Tambahan', icon: UserPlus },
+    { href: '/riwayat-input', label: 'Riwayat Data Input', icon: Database },
     { href: '/list-tidak-hadir', label: 'List Tidak Hadir Training', icon: ClipboardList },
     { href: '/rekap', label: 'Rekap Data', icon: FileSpreadsheet },
     { href: '/soft-skill', label: 'List Soft Skill', icon: GraduationCap },
