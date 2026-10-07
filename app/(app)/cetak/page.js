@@ -315,16 +315,6 @@ export default function CetakPage() {
             const chunkItems = groupItems.slice(cIdx * chunkSize, (cIdx + 1) * chunkSize);
             const startNo = cIdx * chunkSize + 1;
 
-            // Header Judul 15pt bold center
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(15);
-            doc.setTextColor(0, 0, 0);
-            doc.text('LAMPIRAN DETAIL PESERTA TIDAK HADIR', 105, 18, { align: 'center' });
-
-            // Subjudul 12pt bold center, 2mm gap below main title, 6mm space before table
-            doc.setFontSize(12);
-            doc.text(`JENIS TRAINING: ${groupKey}`, 105, 25, { align: 'center' });
-
             const tableRows = chunkItems.map((item, idx) => [
               String(startNo + idx),
               item.training,
@@ -335,10 +325,8 @@ export default function CetakPage() {
               item.alasan_tidak_hadir,
             ]);
 
-            const startY = 31; // 25 + 6mm gap = 31mm
-
             autoTable(doc, {
-              startY: startY,
+              startY: 31,
               head: [['NO', 'TRAINING', 'NIK', 'NAMA', 'KD TOKO', 'NAMA TOKO', 'ALASAN TIDAK HADIR']],
               body: tableRows,
               theme: 'grid',
@@ -373,6 +361,16 @@ export default function CetakPage() {
                 6: { halign: 'left', cellWidth: 26 },
               },
               didDrawPage: function () {
+                // Judul & Subjudul Utama
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(15);
+                doc.setTextColor(0, 0, 0);
+                doc.text('LAMPIRAN DETAIL PESERTA TIDAK HADIR', 105, 18, { align: 'center' });
+
+                doc.setFontSize(12);
+                doc.text(`JENIS TRAINING: ${groupKey}`, 105, 25, { align: 'center' });
+
+                // Footer
                 const pageY = 284;
                 doc.setLineWidth(0.2);
                 doc.setDrawColor(0, 0, 0);
@@ -389,7 +387,8 @@ export default function CetakPage() {
 
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(0, 0, 0);
-                doc.text(`Halaman ${totalPageCounter}`, 198, pageY + 2, { align: 'right' });
+                const currentPage = doc.internal.getNumberOfPages();
+                doc.text(`Halaman ${currentPage}`, 198, pageY + 2, { align: 'right' });
               },
             });
           }

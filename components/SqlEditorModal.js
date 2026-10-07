@@ -185,7 +185,7 @@ export default function SqlEditorModal({ isOpen, onClose }) {
               Langkah Singkat Menjalankan Skrip:
             </p>
             <ol className="list-decimal list-inside space-y-1 text-[11px] text-blue-900">
-              <li>Klik tombol <strong>"Salin Semua SQL"</strong> di atas.</li>
+              <li>Klik tombol <strong>&quot;Salin Semua SQL&quot;</strong> di atas.</li>
               <li>Buka proyek Supabase Anda di browser (<a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-bold text-blue-700">supabase.com/dashboard</a>).</li>
               <li>Pilih menu <strong>SQL Editor</strong> di bilah navigasi kiri &gt; Klik <strong>New Query</strong>.</li>
               <li>Tempel (Paste) kode SQL tersebut lalu klik <strong>Run</strong>.</li>
