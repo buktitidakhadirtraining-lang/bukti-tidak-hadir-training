@@ -337,11 +337,25 @@ where peran = 'paket_ttd'
   );
 create index if not exists idx_ttd_cabang_lookup on ttd_cabang (cabang, peran);
 
+create table if not exists pengaturan_cetak (
+  id uuid primary key default gen_random_uuid(),
+  cabang text not null,
+  jenis text not null,
+  data jsonb not null,
+  updated_by uuid,
+  updated_at timestamptz default now() not null,
+  unique (cabang, jenis)
+);
+
+alter table pengaturan_cetak drop constraint if exists pengaturan_cetak_updated_by_fkey;
+create index if not exists idx_pengaturan_cetak_lookup on pengaturan_cetak (cabang, jenis);
+
 alter table cetak_rekap enable row level security;
 alter table list_tidak_hadir enable row level security;
 alter table data_tambahan enable row level security;
 alter table cetak_list_tidak_hadir enable row level security;
 alter table ttd_cabang enable row level security;
+alter table pengaturan_cetak enable row level security;
 
 drop policy if exists "Select ttd_cabang per cabang" on ttd_cabang;
 drop policy if exists "Insert ttd_cabang per cabang" on ttd_cabang;
@@ -353,6 +367,16 @@ create policy "Select ttd_cabang per cabang" on ttd_cabang for select using (tru
 create policy "Insert ttd_cabang per cabang" on ttd_cabang for insert with check (true);
 create policy "Update ttd_cabang per cabang" on ttd_cabang for update using (true);
 create policy "Delete ttd_cabang per cabang" on ttd_cabang for delete using (true);
+
+drop policy if exists "Select pengaturan_cetak per cabang" on pengaturan_cetak;
+drop policy if exists "Insert pengaturan_cetak per cabang" on pengaturan_cetak;
+drop policy if exists "Update pengaturan_cetak per cabang" on pengaturan_cetak;
+drop policy if exists "Delete pengaturan_cetak per cabang" on pengaturan_cetak;
+
+create policy "Select pengaturan_cetak per cabang" on pengaturan_cetak for select using (true);
+create policy "Insert pengaturan_cetak per cabang" on pengaturan_cetak for insert with check (true);
+create policy "Update pengaturan_cetak per cabang" on pengaturan_cetak for update using (true);
+create policy "Delete pengaturan_cetak per cabang" on pengaturan_cetak for delete using (true);
 
 -- ==============================================================================
 -- 16. RELOAD SCHEMA CACHE POSTGREST

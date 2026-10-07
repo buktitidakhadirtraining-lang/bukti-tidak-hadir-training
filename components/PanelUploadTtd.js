@@ -72,6 +72,7 @@ async function processPackageSignatureFile(file) {
 export default function PanelUploadTtd({
   ttdRecords = [], // Array dari /api/ttd
   printFormat = 'rekap_dispensasi', // 'rekap_dispensasi' | 'soft_skill'
+  modeGambar = 'hanya_ttd', // 'hanya_ttd' | 'lengkap'
   userRole = 'admin_cabang',
   branchName = '',
   branchId = '',
@@ -287,9 +288,15 @@ export default function PanelUploadTtd({
             </div>
             <p className="text-xs text-gray-500">
               {isSoftSkill ? (
-                <>
-                  Disimpan ke Google Drive cabang {branchName ? `(${branchName})` : ''} &amp; menggantikan seluruh blok tanda tangan pada versi &quot;Sudah Ada TTD (Gbr 7)&quot;.
-                </>
+                modeGambar === 'hanya_ttd' ? (
+                  <>
+                    Disimpan ke Google Drive cabang {branchName ? `(${branchName})` : ''} &amp; otomatis tampil pada ruang tanda tangan versi &quot;Sudah Ada TTD (Gbr 7)&quot;.
+                  </>
+                ) : (
+                  <>
+                    Disimpan ke Google Drive cabang {branchName ? `(${branchName})` : ''} &amp; menggantikan seluruh blok tanda tangan pada versi &quot;Sudah Ada TTD (Gbr 7)&quot;.
+                  </>
+                )
               ) : (
                 <>
                   Disimpan ke Google Drive cabang {branchName ? `(${branchName})` : ''} &amp; menggantikan seluruh blok tanda tangan pada versi &quot;Ada TTD (Gbr 3)&quot;.
@@ -314,14 +321,22 @@ export default function PanelUploadTtd({
         <div className="space-y-1">
           <p className="font-semibold text-blue-900">
             {isSoftSkill
-              ? 'Upload satu gambar berisi seluruh tabel tanda tangan (Mengetahui 2, Mengetahui 1, Membuat, dan 3 TTD).'
+              ? modeGambar === 'hanya_ttd'
+                ? 'Upload satu gambar berisi 3 tanda tangan berjajar, dibagi tiga sama lebar, tanpa jabatan dan nama.'
+                : 'Upload satu gambar berisi seluruh tabel tanda tangan (Mengetahui 2, Mengetahui 1, Membuat, dan 3 TTD).'
               : 'Upload satu gambar berisi seluruh tabel tanda tangan (Mengetahui, Dibuat oleh, 4 TTD, dan nama jabatan).'}
           </p>
           <p className="text-blue-800/80 leading-relaxed text-[11px]">
             {isSoftSkill ? (
-              <>
-                Sesuai blok tanda tangan pada <strong>Gambar 7</strong> (Mengetahui 2 Deputy Branch Manager ADM, Mengetahui 1 Human Resource Manager, Membuat Training Center Supervisor). Potong gambar tepat di tepi garis tabel. Disarankan format <strong>PNG</strong> dengan lebar minimal <strong>1200 px</strong> (maksimal file 5 MB). Gambar akan tampil dalam ukuran lebar penuh tanpa crop atau distorsi.
-              </>
+              modeGambar === 'hanya_ttd' ? (
+                <>
+                  Gambar hanya berisi 3 goresan tanda tangan berjajar horizontal. Nama dan jabatan akan otomatis ditulis oleh aplikasi sesuai pengaturan di atas. Disarankan format <strong>PNG transparan</strong> dengan lebar minimal <strong>1200 px</strong> (maksimal file 5 MB).
+                </>
+              ) : (
+                <>
+                  Sesuai blok tanda tangan pada <strong>Gambar 7</strong> (Mengetahui 2 Deputy Branch Manager ADM, Mengetahui 1 Human Resource Manager, Membuat Training Center Supervisor). Potong gambar tepat di tepi garis tabel. Disarankan format <strong>PNG</strong> dengan lebar minimal <strong>1200 px</strong> (maksimal file 5 MB). Gambar akan tampil dalam ukuran lebar penuh tanpa crop atau distorsi.
+                </>
+              )
             ) : (
               <>
                 Sesuai blok tanda tangan pada <strong>Gambar 3</strong> (DBM Operasional, DBM Admin, HRD Manager, TC Supervisor). Potong gambar tepat di tepi garis tabel. Disarankan format <strong>PNG</strong> dengan lebar minimal <strong>1200 px</strong> (maksimal file 5 MB). Gambar akan tampil dalam ukuran lebar penuh tanpa crop atau distorsi.

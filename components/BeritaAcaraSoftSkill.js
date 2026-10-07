@@ -5,13 +5,26 @@ import React from 'react';
 
 export default function BeritaAcaraSoftSkill({
   data = [],
-  ttdMode = 'ada', // 'ada' (Gambar 8) | 'kosong'
+  ttdMode = 'ada', // 'ada' | 'kosong'
   cabang = 'Surabaya',
   periode = 'September 2026',
   tanggalDibuat = '30 September 2026',
   inkColor = '#122b52',
-  ttdImages = {}, // { dbm_admin: dataUrl, hrd_manager: dataUrl, tc_supervisor: dataUrl }
+  ttdImages = {},
+  signerConfig = {},
 }) {
+  const {
+    mengetahui2_jabatan = 'Deputy Branch Manager ADM',
+    mengetahui2_nama = 'RICKY MARIO',
+    mengetahui1_jabatan = 'Human Resource Manager',
+    mengetahui1_nama = 'ABEDNEGO SETYA NUGROHO',
+    membuat_jabatan = 'Training Center Supervisor',
+    membuat_nama = 'ROKHMAN',
+    mode_gambar = 'hanya_ttd',
+  } = signerConfig;
+
+  const hasSoftSkillTtd = Boolean(ttdImages?.paket_ttd_softskill);
+  const isModeLengkap = mode_gambar === 'lengkap';
   return (
     <div
       className="sheet text-xs leading-relaxed"
@@ -161,8 +174,9 @@ export default function BeritaAcaraSoftSkill({
         Demikian berita acara ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.
       </p>
 
-      {/* 6. Kotak Tanda Tangan: Paket TTD Tunggal Soft Skill (Sudah Ada TTD) atau Tabel Bawaan Kosong (TTD Kosong) */}
-      {ttdMode === 'ada' && ttdImages?.paket_ttd_softskill ? (
+      {/* 6. Kotak Tanda Tangan */}
+      {ttdMode === 'ada' && isModeLengkap && hasSoftSkillTtd ? (
+        // Mode Gambar Lengkap: gambar paket ditempel utuh menggantikan seluruh blok tanda tangan
         <div className="w-full print-break-avoid pt-2" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -178,35 +192,59 @@ export default function BeritaAcaraSoftSkill({
           />
         </div>
       ) : (
+        // Mode Hanya Tanda Tangan (Default) atau TTD Kosong: teks jabatan & nama dari pengaturan
         <div className="overflow-x-auto print-break-avoid pt-2" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+          {/* Header 3 Kolom: Label & Jabatan */}
           <div className="grid grid-cols-3 gap-4 text-center">
-            {/* Kolom 1: Mengetahui 2, Deputy Branch Manager ADM - RICKY MARIO */}
-            <div className="flex flex-col items-center relative">
+            <div className="flex flex-col items-center px-1">
               <p className="font-medium text-xs mb-0.5">Mengetahui 2,</p>
-              <p className="font-bold text-xs mb-1">Deputy Branch Manager ADM</p>
-              <div className="h-16 w-full" />
-              <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
-                RICKY MARIO
-              </p>
+              <p className="font-bold text-xs leading-snug">{mengetahui2_jabatan}</p>
             </div>
-
-            {/* Kolom 2: Mengetahui 1, Human Resource Manager - ABEDNEGO SETYA NUGROHO */}
-            <div className="flex flex-col items-center relative">
+            <div className="flex flex-col items-center px-1">
               <p className="font-medium text-xs mb-0.5">Mengetahui 1,</p>
-              <p className="font-bold text-xs mb-1">Human Resource Manager</p>
-              <div className="h-16 w-full" />
-              <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
-                ABEDNEGO SETYA NUGROHO
+              <p className="font-bold text-xs leading-snug">{mengetahui1_jabatan}</p>
+            </div>
+            <div className="flex flex-col items-center px-1">
+              <p className="font-medium text-xs mb-0.5">Membuat,</p>
+              <p className="font-bold text-xs leading-snug">{membuat_jabatan}</p>
+            </div>
+          </div>
+
+          {/* Area Tanda Tangan Tengah */}
+          {ttdMode === 'ada' && hasSoftSkillTtd ? (
+            <div className="w-full my-1.5 flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ttdImages.paket_ttd_softskill}
+                alt="3 Goresan Tanda Tangan Soft Skill"
+                className="w-full max-h-[85px] object-contain mx-auto block"
+                style={{
+                  width: '100%',
+                  maxWidth: '100%',
+                  maxHeight: '85px',
+                  objectFit: 'contain',
+                }}
+              />
+            </div>
+          ) : (
+            <div className="h-16 w-full" />
+          )}
+
+          {/* Footer 3 Kolom: Nama Penandatangan Bergaris Bawah */}
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="flex flex-col items-center px-1">
+              <p className="font-bold text-xs uppercase underline tracking-wider break-words leading-tight">
+                {mengetahui2_nama}
               </p>
             </div>
-
-            {/* Kolom 3: Membuat, Training Center Supervisor - ROKHMAN */}
-            <div className="flex flex-col items-center relative">
-              <p className="font-medium text-xs mb-0.5">Membuat,</p>
-              <p className="font-bold text-xs mb-1">Training Center Supervisor</p>
-              <div className="h-16 w-full" />
-              <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
-                ROKHMAN
+            <div className="flex flex-col items-center px-1">
+              <p className="font-bold text-xs uppercase underline tracking-wider break-words leading-tight">
+                {mengetahui1_nama}
+              </p>
+            </div>
+            <div className="flex flex-col items-center px-1">
+              <p className="font-bold text-xs uppercase underline tracking-wider break-words leading-tight">
+                {membuat_nama}
               </p>
             </div>
           </div>

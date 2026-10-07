@@ -165,11 +165,44 @@ CREATE POLICY "Delete ttd_cabang per cabang" ON public.ttd_cabang
     FOR DELETE USING (true);
 
 
--- 4. Berikan Izin Akses Tabel
+-- 4. TABEL: pengaturan_cetak (Menyimpan Pengaturan Nama & Jabatan Penandatangan Berita Acara)
+CREATE TABLE IF NOT EXISTS public.pengaturan_cetak (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cabang TEXT NOT NULL,
+    jenis TEXT NOT NULL,
+    data JSONB NOT NULL,
+    updated_by UUID,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (cabang, jenis)
+);
+
+ALTER TABLE public.pengaturan_cetak DROP CONSTRAINT IF EXISTS pengaturan_cetak_updated_by_fkey;
+CREATE INDEX IF NOT EXISTS idx_pengaturan_cetak_lookup ON public.pengaturan_cetak (cabang, jenis);
+ALTER TABLE public.pengaturan_cetak ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Select pengaturan_cetak per cabang" ON public.pengaturan_cetak;
+DROP POLICY IF EXISTS "Insert pengaturan_cetak per cabang" ON public.pengaturan_cetak;
+DROP POLICY IF EXISTS "Update pengaturan_cetak per cabang" ON public.pengaturan_cetak;
+DROP POLICY IF EXISTS "Delete pengaturan_cetak per cabang" ON public.pengaturan_cetak;
+
+CREATE POLICY "Select pengaturan_cetak per cabang" ON public.pengaturan_cetak
+    FOR SELECT USING (true);
+
+CREATE POLICY "Insert pengaturan_cetak per cabang" ON public.pengaturan_cetak
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Update pengaturan_cetak per cabang" ON public.pengaturan_cetak
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Delete pengaturan_cetak per cabang" ON public.pengaturan_cetak
+    FOR DELETE USING (true);
+
+
+-- 5. Berikan Izin Akses Tabel
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
--- 5. Reload Schema PostgREST
+-- 6. Reload Schema PostgREST
 NOTIFY pgrst, 'reload schema';`;
 
 export default function SqlEditorModal({ isOpen, onClose }) {

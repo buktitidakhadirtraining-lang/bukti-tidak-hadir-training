@@ -19,6 +19,9 @@ import {
   CheckCircle2,
   Calendar,
   PenTool,
+  Save,
+  RotateCcw,
+  UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -112,6 +115,89 @@ export default function CetakPage() {
   const [ttdRecords, setTtdRecords] = useState([]);
   const [ttdImages, setTtdImages] = useState({});
   const [isTtdLoading, setIsTtdLoading] = useState(false);
+
+  // Pengaturan Penandatangan Soft Skill (Gambar 6 & 7)
+  const DEFAULT_SOFT_SKILL_SIGNERS = useMemo(
+    () => ({
+      mengetahui2_jabatan: 'Deputy Branch Manager ADM',
+      mengetahui2_nama: 'RICKY MARIO',
+      mengetahui1_jabatan: 'Human Resource Manager',
+      mengetahui1_nama: 'ABEDNEGO SETYA NUGROHO',
+      membuat_jabatan: 'Training Center Supervisor',
+      membuat_nama: 'ROKHMAN',
+      mode_gambar: 'hanya_ttd', // 'hanya_ttd' | 'lengkap'
+    }),
+    []
+  );
+
+  const [softSkillSignerConfig, setSoftSkillSignerConfig] = useState({
+    mengetahui2_jabatan: 'Deputy Branch Manager ADM',
+    mengetahui2_nama: 'RICKY MARIO',
+    mengetahui1_jabatan: 'Human Resource Manager',
+    mengetahui1_nama: 'ABEDNEGO SETYA NUGROHO',
+    membuat_jabatan: 'Training Center Supervisor',
+    membuat_nama: 'ROKHMAN',
+    mode_gambar: 'hanya_ttd',
+  });
+  const [isSavingSignerConfig, setIsSavingSignerConfig] = useState(false);
+
+  const fetchSignerConfig = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set('jenis', 'soft_skill');
+      if (branchId) params.set('branch_id', branchId);
+      const res = await fetch(`/api/pengaturan-cetak?${params.toString()}`);
+      const json = await res.json();
+      if (json.ok && json.data) {
+        setSoftSkillSignerConfig({
+          ...DEFAULT_SOFT_SKILL_SIGNERS,
+          ...json.data,
+        });
+      }
+    } catch (e) {
+      console.error('[fetchSignerConfig error]:', e);
+    }
+  }, [branchId, DEFAULT_SOFT_SKILL_SIGNERS]);
+
+  useEffect(() => {
+    fetchSignerConfig();
+  }, [fetchSignerConfig]);
+
+  const handleSaveSignerConfig = async () => {
+    if (meta?.userRole !== 'admin_cabang' && meta?.userRole !== 'admin_pusat') {
+      toast.error('Hanya Admin Cabang atau Admin Pusat yang dapat menyimpan pengaturan penandatangan.');
+      return;
+    }
+
+    setIsSavingSignerConfig(true);
+    const toastId = toast.loading('Menyimpan pengaturan penandatangan Soft Skill...');
+    try {
+      const res = await fetch('/api/pengaturan-cetak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jenis: 'soft_skill',
+          branch_id: branchId || undefined,
+          data: softSkillSignerConfig,
+        }),
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        throw new Error(json.error || 'Gagal menyimpan pengaturan penandatangan');
+      }
+      toast.success('Pengaturan penandatangan berhasil disimpan per cabang!', { id: toastId });
+    } catch (err) {
+      console.error('[handleSaveSignerConfig error]:', err);
+      toast.error(err.message || 'Gagal menyimpan pengaturan penandatangan', { id: toastId });
+    } finally {
+      setIsSavingSignerConfig(false);
+    }
+  };
+
+  const handleResetSignerConfig = () => {
+    setSoftSkillSignerConfig(DEFAULT_SOFT_SKILL_SIGNERS);
+    toast.info('Pengaturan penandatangan dikembalikan ke nilai default.');
+  };
 
   const fetchTtdRecords = useCallback(async () => {
     try {
@@ -753,38 +839,102 @@ export default function CetakPage() {
         currentY += 8;
 
         const softSkillImg = ttdImages?.paket_ttd_softskill;
-        if (softSkillTtdMode === 'ada' && softSkillImg) {
-          try {
-            const imgProps = doc.getImageProperties(softSkillImg);
-            const targetWidth = 186;
-            let imgHeight = (imgProps.height * targetWidth) / imgProps.width;
+        const config = softSkillSignerConfig || {
+          mengetahui2_jabatan: 'Deputy Branch Manager ADM',
+          mengetahui2_nama: 'RICKY MARIO',
+          mengetahui1_jabatan: 'Human Resource Manager',
+          mengetahui1_nama: 'ABEDNEGO SETYA NUGROHO',
+          membuat_jabatan: 'Training Center Supervisor',
+          membuat_nama: 'ROKHMAN',
+          mode_gambar: 'hanya_ttd',
+        };
 
-            const maxHeightAvailable = 297 - 12 - currentY;
-            if (imgHeight > maxHeightAvailable && maxHeightAvailable > 15) {
-              const scale = maxHeightAvailable / imgHeight;
-              imgHeight = maxHeightAvailable;
-              const imgWidth = targetWidth * scale;
-              const x = 12 + (targetWidth - imgWidth) / 2;
-              doc.addImage(softSkillImg, 'PNG', x, currentY, imgWidth, imgHeight);
-            } else {
-              doc.addImage(softSkillImg, 'PNG', 12, currentY, targetWidth, imgHeight);
+        if (softSkillTtdMode === 'ada' && softSkillImg) {
+          if (config.mode_gambar === 'lengkap') {
+            // Mode Gambar Lengkap: ditempel utuh menggantikan seluruh blok tanda tangan
+            try {
+              const imgProps = doc.getImageProperties(softSkillImg);
+              const targetWidth = 186;
+              let imgHeight = (imgProps.height * targetWidth) / imgProps.width;
+
+              const maxHeightAvailable = 297 - 12 - currentY;
+              if (imgHeight > maxHeightAvailable && maxHeightAvailable > 15) {
+                const scale = maxHeightAvailable / imgHeight;
+                imgHeight = maxHeightAvailable;
+                const imgWidth = targetWidth * scale;
+                const x = 12 + (targetWidth - imgWidth) / 2;
+                doc.addImage(softSkillImg, 'PNG', x, currentY, imgWidth, imgHeight);
+              } else {
+                doc.addImage(softSkillImg, 'PNG', 12, currentY, targetWidth, imgHeight);
+              }
+            } catch (imgErr) {
+              console.error('Gagal menambahkan paket TTD ke PDF Soft Skill:', imgErr);
+              doc.addImage(softSkillImg, 'PNG', 12, currentY, 186, 35);
             }
-          } catch (imgErr) {
-            console.error('Gagal menambahkan paket TTD ke PDF Soft Skill:', imgErr);
-            doc.addImage(softSkillImg, 'PNG', 12, currentY, 186, 35);
+          } else {
+            // Mode Hanya Tanda Tangan (Default):
+            // 1. Baris Label & Jabatan dalam 3 Kolom
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+            doc.text('Mengetahui 2,', 43, currentY, { align: 'center' });
+            doc.text('Mengetahui 1,', 105, currentY, { align: 'center' });
+            doc.text('Membuat,', 167, currentY, { align: 'center' });
+            currentY += 4.5;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.text(config.mengetahui2_jabatan || 'Deputy Branch Manager ADM', 43, currentY, { align: 'center', maxWidth: 58 });
+            doc.text(config.mengetahui1_jabatan || 'Human Resource Manager', 105, currentY, { align: 'center', maxWidth: 58 });
+            doc.text(config.membuat_jabatan || 'Training Center Supervisor', 167, currentY, { align: 'center', maxWidth: 58 });
+            currentY += 5;
+
+            // 2. Gambar 3 TTD di tengah
+            try {
+              const imgProps = doc.getImageProperties(softSkillImg);
+              let imgH = (imgProps.height * 186) / imgProps.width;
+              if (imgH > 22) imgH = 22;
+              doc.addImage(softSkillImg, 'PNG', 12, currentY, 186, imgH);
+              currentY += imgH + 4;
+            } catch (imgErr) {
+              console.error('Gagal menambahkan gambar 3 TTD ke PDF:', imgErr);
+              doc.addImage(softSkillImg, 'PNG', 12, currentY, 186, 18);
+              currentY += 22;
+            }
+
+            // 3. Nama Penandatangan Bergaris Bawah dalam 3 Kolom
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            const nama2 = (config.mengetahui2_nama || 'RICKY MARIO').toUpperCase();
+            const nama1 = (config.mengetahui1_nama || 'ABEDNEGO SETYA NUGROHO').toUpperCase();
+            const namaMembuat = (config.membuat_nama || 'ROKHMAN').toUpperCase();
+
+            doc.text(nama2, 43, currentY, { align: 'center', maxWidth: 58 });
+            doc.text(nama1, 105, currentY, { align: 'center', maxWidth: 58 });
+            doc.text(namaMembuat, 167, currentY, { align: 'center', maxWidth: 58 });
+
+            // Garis bawah nama
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.25);
+            const w2 = Math.min(doc.getTextWidth(nama2), 58);
+            const w1 = Math.min(doc.getTextWidth(nama1), 58);
+            const wM = Math.min(doc.getTextWidth(namaMembuat), 58);
+            doc.line(43 - w2 / 2, currentY + 0.8, 43 + w2 / 2, currentY + 0.8);
+            doc.line(105 - w1 / 2, currentY + 0.8, 105 + w1 / 2, currentY + 0.8);
+            doc.line(167 - wM / 2, currentY + 0.8, 167 + wM / 2, currentY + 0.8);
           }
         } else {
+          // Versi TTD Kosong (atau jika gambar belum diupload)
           autoTable(doc, {
             startY: currentY,
             head: [[
-              'Mengetahui 2,\nDeputy Branch Manager ADM',
-              'Mengetahui 1,\nHuman Resource Manager',
-              'Membuat,\nTraining Center Supervisor'
+              `Mengetahui 2,\n${config.mengetahui2_jabatan || 'Deputy Branch Manager ADM'}`,
+              `Mengetahui 1,\n${config.mengetahui1_jabatan || 'Human Resource Manager'}`,
+              `Membuat,\n${config.membuat_jabatan || 'Training Center Supervisor'}`
             ]],
             body: [[
-              'RICKY MARIO',
-              'ABEDNEGO SETYA NUGROHO',
-              'ROKHMAN'
+              (config.mengetahui2_nama || 'RICKY MARIO').toUpperCase(),
+              (config.mengetahui1_nama || 'ABEDNEGO SETYA NUGROHO').toUpperCase(),
+              (config.membuat_nama || 'ROKHMAN').toUpperCase()
             ]],
             theme: 'grid',
             margin: { left: 12, right: 12 },
@@ -818,10 +968,10 @@ export default function CetakPage() {
             },
             didDrawCell: function (data) {
               if (data.section === 'body' && data.row.index === 0) {
-                const lineWidth = data.cell.width * 0.8;
-                const lineX1 = data.cell.x + (data.cell.width - lineWidth) / 2;
-                const lineX2 = lineX1 + lineWidth;
-                const lineY = data.cell.y + data.cell.height - 6.2;
+                const textW = Math.min(doc.getTextWidth(data.cell.text[0] || ''), data.cell.width * 0.85);
+                const lineX1 = data.cell.x + (data.cell.width - textW) / 2;
+                const lineX2 = lineX1 + textW;
+                const lineY = data.cell.y + data.cell.height - 1.5;
 
                 doc.setDrawColor(0, 0, 0);
                 doc.setLineWidth(0.25);
@@ -1252,89 +1402,251 @@ export default function CetakPage() {
 
         {/* B. Pengaturan Khusus Berita Acara Soft Skill (Gambar 6 & 7) */}
         {printFormat === 'soft_skill' && (
-          <div className="pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs bg-indigo-50/40 p-3.5 rounded-xl border border-indigo-100">
-            {/* Pilihan Mode Tanda Tangan */}
-            <div>
-              <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
-                <PenTool className="w-3.5 h-3.5 text-[#0056b3]" />
-                Versi Tanda Tangan
-              </label>
-              <div className="inline-flex w-full p-1 bg-white rounded-lg border border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setSoftSkillTtdMode('kosong')}
-                  className={`flex-1 py-1 text-center font-bold rounded text-xs transition-colors ${
-                    softSkillTtdMode === 'kosong'
-                      ? 'bg-blue-100 text-[#0056b3]'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+          <div className="pt-3 border-t border-gray-100 space-y-3">
+            {/* Baris 1: Kontrol Umum (Versi TTD, Warna Tinta, Cabang, Periode, Tanggal Dibuat) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs bg-indigo-50/40 p-3.5 rounded-xl border border-indigo-100">
+              {/* Pilihan Mode Tanda Tangan */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+                  <PenTool className="w-3.5 h-3.5 text-[#0056b3]" />
+                  Versi Tanda Tangan
+                </label>
+                <div className="inline-flex w-full p-1 bg-white rounded-lg border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setSoftSkillTtdMode('kosong')}
+                    className={`flex-1 py-1 text-center font-bold rounded text-xs transition-colors ${
+                      softSkillTtdMode === 'kosong'
+                        ? 'bg-blue-100 text-[#0056b3]'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    TTD Kosong
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSoftSkillTtdMode('ada')}
+                    className={`flex-1 py-1 text-center font-bold rounded text-xs transition-colors ${
+                      softSkillTtdMode === 'ada'
+                        ? 'bg-blue-100 text-[#0056b3]'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Sudah Ada TTD (Gbr 7)
+                  </button>
+                </div>
+              </div>
+
+              {/* Warna Tinta TTD */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Warna Tinta TTD</label>
+                <select
+                  value={inkColor}
+                  onChange={(e) => setInkColor(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
                 >
-                  TTD Kosong
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSoftSkillTtdMode('ada')}
-                  className={`flex-1 py-1 text-center font-bold rounded text-xs transition-colors ${
-                    softSkillTtdMode === 'ada'
-                      ? 'bg-blue-100 text-[#0056b3]'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Sudah Ada TTD (Gbr 7)
-                </button>
+                  <option value="#122b52">Biru Bolpoin Resmi</option>
+                  <option value="#111827">Hitam Pekat</option>
+                </select>
+              </div>
+
+              {/* Cabang */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Cabang</label>
+                <input
+                  type="text"
+                  value={softSkillCabang}
+                  onChange={(e) => setSoftSkillCabang(e.target.value)}
+                  placeholder="Surabaya"
+                  className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+                />
+              </div>
+
+              {/* Periode Training */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Periode Training</label>
+                <input
+                  type="text"
+                  value={softSkillPeriode}
+                  onChange={(e) => setSoftSkillPeriode(e.target.value)}
+                  placeholder="September 2026"
+                  className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+                />
+              </div>
+
+              {/* Tanggal Dibuat */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#0056b3]" />
+                  Tanggal Dibuat
+                </label>
+                <input
+                  type="text"
+                  value={softSkillTanggalDibuat}
+                  onChange={(e) => setSoftSkillTanggalDibuat(e.target.value)}
+                  placeholder="30 September 2026"
+                  className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
+                />
               </div>
             </div>
 
-            {/* Warna Tinta TTD */}
-            <div>
-              <label className="block font-bold text-gray-700 mb-1">Warna Tinta TTD</label>
-              <select
-                value={inkColor}
-                onChange={(e) => setInkColor(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
-              >
-                <option value="#122b52">Biru Bolpoin Resmi</option>
-                <option value="#111827">Hitam Pekat</option>
-              </select>
-            </div>
+            {/* Baris 2: Grup Pengaturan Penandatangan (Mengetahui 2, Mengetahui 1, Membuat) */}
+            <div className="bg-white p-3.5 rounded-xl border border-indigo-200 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-[#0056b3]" />
+                  <span className="font-bold text-gray-800 text-xs sm:text-sm">
+                    Pengaturan Penandatangan (Berita Acara Soft Skill)
+                  </span>
+                  <span className="text-[11px] text-gray-500 hidden md:inline">
+                    (Tersimpan per cabang: {selectedBranchObj?.name || meta?.userBranchName || softSkillCabang || 'Cabang Aktif'})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetSignerConfig}
+                    className="px-2.5 py-1 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1 transition-colors"
+                    title="Kembalikan nama & jabatan ke default"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Reset ke Default
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingSignerConfig}
+                    onClick={handleSaveSignerConfig}
+                    className="px-3 py-1 text-xs font-bold text-white bg-[#0056b3] hover:bg-[#004494] disabled:bg-gray-400 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    {isSavingSignerConfig ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
+                    )}
+                    Simpan Pengaturan
+                  </button>
+                </div>
+              </div>
 
-            {/* Cabang */}
-            <div>
-              <label className="block font-bold text-gray-700 mb-1">Cabang</label>
-              <input
-                type="text"
-                value={softSkillCabang}
-                onChange={(e) => setSoftSkillCabang(e.target.value)}
-                placeholder="Surabaya"
-                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
-              />
-            </div>
+              {/* 3 Kelompok Input Penandatangan */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                {/* 1. Mengetahui 2 */}
+                <div className="p-2.5 bg-blue-50/50 rounded-lg border border-blue-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[#0056b3] bg-blue-100 px-2 py-0.5 rounded text-[11px]">
+                      Mengetahui 2,
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Jabatan:</label>
+                    <input
+                      type="text"
+                      value={softSkillSignerConfig.mengetahui2_jabatan || ''}
+                      onChange={(e) =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          mengetahui2_jabatan: e.target.value,
+                        }))
+                      }
+                      placeholder="Deputy Branch Manager ADM"
+                      className="w-full bg-white border border-gray-300 rounded-md p-1.5 text-xs font-medium text-gray-900 focus:ring-1 focus:ring-[#0056b3]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Nama:</label>
+                    <input
+                      type="text"
+                      value={softSkillSignerConfig.mengetahui2_nama || ''}
+                      onChange={(e) =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          mengetahui2_nama: e.target.value,
+                        }))
+                      }
+                      placeholder="RICKY MARIO"
+                      className="w-full bg-white border border-gray-300 rounded-md p-1.5 text-xs font-bold text-gray-900 focus:ring-1 focus:ring-[#0056b3]"
+                    />
+                  </div>
+                </div>
 
-            {/* Periode Training */}
-            <div>
-              <label className="block font-bold text-gray-700 mb-1">Periode Training</label>
-              <input
-                type="text"
-                value={softSkillPeriode}
-                onChange={(e) => setSoftSkillPeriode(e.target.value)}
-                placeholder="September 2026"
-                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
-              />
-            </div>
+                {/* 2. Mengetahui 1 */}
+                <div className="p-2.5 bg-blue-50/50 rounded-lg border border-blue-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[#0056b3] bg-blue-100 px-2 py-0.5 rounded text-[11px]">
+                      Mengetahui 1,
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Jabatan:</label>
+                    <input
+                      type="text"
+                      value={softSkillSignerConfig.mengetahui1_jabatan || ''}
+                      onChange={(e) =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          mengetahui1_jabatan: e.target.value,
+                        }))
+                      }
+                      placeholder="Human Resource Manager"
+                      className="w-full bg-white border border-gray-300 rounded-md p-1.5 text-xs font-medium text-gray-900 focus:ring-1 focus:ring-[#0056b3]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Nama:</label>
+                    <input
+                      type="text"
+                      value={softSkillSignerConfig.mengetahui1_nama || ''}
+                      onChange={(e) =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          mengetahui1_nama: e.target.value,
+                        }))
+                      }
+                      placeholder="ABEDNEGO SETYA NUGROHO"
+                      className="w-full bg-white border border-gray-300 rounded-md p-1.5 text-xs font-bold text-gray-900 focus:ring-1 focus:ring-[#0056b3]"
+                    />
+                  </div>
+                </div>
 
-            {/* Tanggal Dibuat */}
-            <div>
-              <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[#0056b3]" />
-                Tanggal Dibuat
-              </label>
-              <input
-                type="text"
-                value={softSkillTanggalDibuat}
-                onChange={(e) => setSoftSkillTanggalDibuat(e.target.value)}
-                placeholder="30 September 2026"
-                className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
-              />
+                {/* 3. Membuat */}
+                <div className="p-2.5 bg-blue-50/50 rounded-lg border border-blue-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[#0056b3] bg-blue-100 px-2 py-0.5 rounded text-[11px]">
+                      Membuat,
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Jabatan:</label>
+                    <input
+                      type="text"
+                      value={softSkillSignerConfig.membuat_jabatan || ''}
+                      onChange={(e) =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          membuat_jabatan: e.target.value,
+                        }))
+                      }
+                      placeholder="Training Center Supervisor"
+                      className="w-full bg-white border border-gray-300 rounded-md p-1.5 text-xs font-medium text-gray-900 focus:ring-1 focus:ring-[#0056b3]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Nama:</label>
+                    <input
+                      type="text"
+                      value={softSkillSignerConfig.membuat_nama || ''}
+                      onChange={(e) =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          membuat_nama: e.target.value,
+                        }))
+                      }
+                      placeholder="ROKHMAN"
+                      className="w-full bg-white border border-gray-300 rounded-md p-1.5 text-xs font-bold text-gray-900 focus:ring-1 focus:ring-[#0056b3]"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1546,6 +1858,7 @@ export default function CetakPage() {
               periode={softSkillPeriode}
               tanggalDibuat={softSkillTanggalDibuat}
               ttdImages={ttdImages}
+              signerConfig={softSkillSignerConfig}
             />
           </div>
         </ErrorBoundary>
