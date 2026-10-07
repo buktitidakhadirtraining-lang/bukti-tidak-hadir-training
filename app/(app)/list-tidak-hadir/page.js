@@ -4,35 +4,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ClipboardList,
-  Save,
   Loader2,
   RefreshCw,
   Search,
   TableProperties,
-  Edit2,
   Trash2,
   Trash,
   UploadCloud,
-  Download,
   Building2,
+  Database,
+  Printer,
 } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import { MASTER_TRAININGS_LIST } from '../../../lib/trainings-master.js';
-import EditDataTambahanModal from '../../../components/EditDataTambahanModal.js';
 import ImportExportModal from '../../../components/ImportExportModal.js';
 import ConfirmDialog from '../../../components/ConfirmDialog.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
-import { Database } from 'lucide-react';
 
 export default function ListTidakHadirPage() {
-  const [training, setTraining] = useState('YFC');
-  const [nik, setNik] = useState('');
-  const [nama, setNama] = useState('');
-  const [kdToko, setKdToko] = useState('');
-  const [namaToko, setNamaToko] = useState('');
-  const [alasanTidakHadir, setAlasanTidakHadir] = useState('Sakit');
-
-  const [saving, setSaving] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
   const [records, setRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,7 +31,6 @@ export default function ListTidakHadirPage() {
   // Modals
   const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [showSqlModal, setShowSqlModal] = useState(false);
-  const [editingRecord, setEditingRecord] = useState(null);
   const [deleteSingleDialog, setDeleteSingleDialog] = useState({
     isOpen: false,
     record: null,
@@ -93,52 +81,6 @@ export default function ListTidakHadirPage() {
   useEffect(() => {
     fetchRecords();
   }, [fetchRecords]);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!nik.trim() || !nama.trim()) {
-      toast.error('NIK dan Nama Peserta wajib diisi');
-      return;
-    }
-
-    setSaving(true);
-    const toastId = toast.loading('Menyimpan data peserta ke database cabang...');
-
-    try {
-      const res = await fetch('/api/list-tidak-hadir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          training: training.trim(),
-          nik: nik.trim(),
-          nama: nama.trim(),
-          kd_toko: kdToko.trim(),
-          nama_toko: namaToko.trim(),
-          alasan_tidak_hadir: alasanTidakHadir.trim(),
-        }),
-      });
-
-      const json = await res.json();
-      if (res.ok && json.ok) {
-        toast.success(
-          'Data peserta berhasil disimpan dan otomatis masuk ke Lembar Cetak Bukti PDF!',
-          { id: toastId }
-        );
-        // Reset form input
-        setNik('');
-        setNama('');
-        setKdToko('');
-        setNamaToko('');
-        fetchRecords();
-      } else {
-        toast.error(json.error || 'Gagal menyimpan data', { id: toastId });
-      }
-    } catch (err) {
-      toast.error('Terjadi kesalahan jaringan: ' + err.message, { id: toastId });
-    } finally {
-      setSaving(false);
-    }
-  }
 
   // Hapus single data
   async function confirmDeleteSingle() {
@@ -214,15 +156,18 @@ export default function ListTidakHadirPage() {
                 <h1 className="text-xl font-black text-gray-900 font-title">
                   List Tidak Hadir Training
                 </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0056b3] text-[11px] font-bold border border-blue-200">
+                  Impor & Ekspor (Read-Only)
+                </span>
                 {currentUser?.branch_name && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-[#0056b3]">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
                     <Building2 className="w-3 h-3" />
                     <span>{currentUser.branch_name}</span>
                   </span>
                 )}
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                Penginputan dan pengelolaan daftar peserta tidak hadir khusus cabang Anda. Data tersimpan aman dan terisolasi dari cabang lain.
+                Pengelolaan daftar peserta tidak hadir khusus cabang Anda (Read-Only). Data tersimpan aman dan terisolasi dari cabang lain.
               </p>
             </div>
           </div>
@@ -241,157 +186,21 @@ export default function ListTidakHadirPage() {
             <button
               type="button"
               onClick={() => setShowImportExportModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-[#0056b3] rounded-xl text-xs font-bold transition-all border border-blue-200 shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0056b3] hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
             >
               <UploadCloud className="w-4 h-4" />
               <span>Impor / Ekspor Excel/CSV</span>
             </button>
-          </div>
-        </div>
-      </div>
 
-      {/* Form Input Peserta Tidak Hadir */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-soft overflow-hidden">
-        {/* Tricolor Bar */}
-        <div className="indomaret-bar">
-          <div className="indomaret-bar-blue" />
-          <div className="indomaret-bar-yellow" />
-          <div className="indomaret-bar-red" />
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
-            {/* 1. Jenis Training */}
-            <div>
-              <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Jenis Training <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={training}
-                onChange={(e) => setTraining(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
-              >
-                {MASTER_TRAININGS_LIST.map((tName) => (
-                  <option key={tName} value={tName}>
-                    {tName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 2. NIK */}
-            <div>
-              <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                NIK Peserta <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={nik}
-                onChange={(e) => setNik(e.target.value)}
-                placeholder="Contoh: 2015698709"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-mono font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
-              />
-            </div>
-
-            {/* 3. Nama Peserta */}
-            <div>
-              <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Nama Lengkap Peserta <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={nama}
-                onChange={(e) => setNama(e.target.value)}
-                placeholder="Contoh: AHMAD FAUZI"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium uppercase focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
-              />
-            </div>
-
-            {/* 4. KD Toko */}
-            <div>
-              <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Kode Toko
-              </label>
-              <input
-                type="text"
-                value={kdToko}
-                onChange={(e) => setKdToko(e.target.value)}
-                placeholder="Contoh: TVYI, TSSD..."
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-mono font-medium uppercase focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
-              />
-            </div>
-
-            {/* 5. Nama Toko */}
-            <div>
-              <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Nama Toko
-              </label>
-              <input
-                type="text"
-                value={namaToko}
-                onChange={(e) => setNamaToko(e.target.value)}
-                placeholder="Contoh: INDOMARET RAYA DARMO"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium uppercase focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
-              />
-            </div>
-
-            {/* 6. Alasan Tidak Hadir */}
-            <div>
-              <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Alasan Tidak Hadir <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={alasanTidakHadir}
-                onChange={(e) => setAlasanTidakHadir(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
-              >
-                {meta?.reasons ? (
-                  meta.reasons.map((r) => (
-                    <option key={r.id} value={r.name}>
-                      {r.name}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="Sakit">Sakit</option>
-                    <option value="Cuti">Cuti</option>
-                    <option value="Mangkir">Mangkir</option>
-                    <option value="Bencana alam">Bencana alam</option>
-                    <option value="Musibah/kecelakaan">Musibah/kecelakaan</option>
-                    <option value="Menggantikan personil lain">Menggantikan personil lain</option>
-                    <option value="Keluarga inti sakit">Keluarga inti sakit</option>
-                    <option value="Lain - lain">Lain - lain</option>
-                  </>
-                )}
-              </select>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-            <p className="text-[11px] text-gray-500 italic">
-              * Data tersimpan aman di database cabang Anda dan terisolasi dari cabang lain.
-            </p>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2.5 bg-[#0056b3] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 disabled:opacity-50 min-h-[42px]"
+            <Link
+              href="/cetak"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition-all border border-gray-200"
             >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Menyimpan...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>Simpan Peserta Tidak Hadir</span>
-                </>
-              )}
-            </button>
+              <Printer className="w-4 h-4 text-gray-600" />
+              <span>Cetak PDF</span>
+            </Link>
           </div>
-        </form>
+        </div>
       </div>
 
       {/* Tabel Data List Tidak Hadir */}
@@ -445,39 +254,30 @@ export default function ListTidakHadirPage() {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-gray-50 text-gray-700 font-bold border-b border-gray-200">
-                <th className="p-3 text-center w-12">NO</th>
-                <th className="p-3 w-28">TRAINING</th>
-                <th className="p-3 text-center w-28">NIK</th>
-                <th className="p-3">NAMA</th>
-                <th className="p-3 text-center w-24">KD TOKO</th>
-                <th className="p-3 w-36">NAMA TOKO</th>
-                <th className="p-3 w-40">ALASAN TIDAK HADIR</th>
-                <th className="p-3 text-center w-24">AKSI</th>
+                <th className="p-3 text-center w-12 border-r border-gray-200">NO</th>
+                <th className="p-3 w-28 border-r border-gray-200">TRAINING</th>
+                <th className="p-3 text-center w-28 border-r border-gray-200">NIK</th>
+                <th className="p-3 border-r border-gray-200">NAMA</th>
+                <th className="p-3 text-center w-24 border-r border-gray-200">KD TOKO</th>
+                <th className="p-3 w-36 border-r border-gray-200">NAMA TOKO</th>
+                <th className="p-3 w-40 border-r border-gray-200">ALASAN TIDAK HADIR</th>
+                <th className="p-3 text-center w-20">AKSI</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredRecords.length > 0 ? (
                 filteredRecords.map((r, i) => (
                   <tr key={r.id || i} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="p-3 text-center font-bold text-gray-500">{r.no || i + 1}</td>
-                    <td className="p-3 font-semibold text-blue-700 uppercase">{r.training}</td>
-                    <td className="p-3 text-center font-mono font-bold text-gray-800">{r.nik}</td>
-                    <td className="p-3 font-semibold text-gray-900 uppercase">{r.nama}</td>
-                    <td className="p-3 text-center font-mono uppercase text-gray-600">{r.kd_toko || '-'}</td>
-                    <td className="p-3 uppercase text-gray-700">{r.nama_toko || '-'}</td>
-                    <td className="p-3 text-gray-700">{r.alasan_tidak_hadir || '-'}</td>
+                    <td className="p-3 text-center font-bold text-gray-500 border-r border-gray-100">{r.no || i + 1}</td>
+                    <td className="p-3 font-semibold text-blue-700 uppercase border-r border-gray-100">{r.training}</td>
+                    <td className="p-3 text-center font-mono font-bold text-gray-800 border-r border-gray-100">{r.nik}</td>
+                    <td className="p-3 font-semibold text-gray-900 uppercase border-r border-gray-100">{r.nama}</td>
+                    <td className="p-3 text-center font-mono uppercase text-gray-600 border-r border-gray-100">{r.kd_toko || '-'}</td>
+                    <td className="p-3 uppercase text-gray-700 border-r border-gray-100">{r.nama_toko || '-'}</td>
+                    <td className="p-3 text-gray-700 border-r border-gray-100">{r.alasan_tidak_hadir || '-'}</td>
                     <td className="p-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {/* Tombol Edit */}
-                        <button
-                          type="button"
-                          onClick={() => setEditingRecord(r)}
-                          className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit baris data ini"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        {/* Tombol Hapus */}
+                      <div className="flex items-center justify-center">
+                        {/* Tombol Hapus Baris */}
                         <button
                           type="button"
                           onClick={() => setDeleteSingleDialog({ isOpen: true, record: r, loading: false })}
@@ -501,17 +301,6 @@ export default function ListTidakHadirPage() {
           </table>
         </div>
       </div>
-
-      {/* Modal Edit Data */}
-      <EditDataTambahanModal
-        isOpen={Boolean(editingRecord)}
-        record={editingRecord}
-        meta={meta}
-        title="Edit List Tidak Hadir Training"
-        updateEndpoint={editingRecord ? `/api/list-tidak-hadir/${editingRecord.id}` : null}
-        onClose={() => setEditingRecord(null)}
-        onUpdated={fetchRecords}
-      />
 
       {/* Modal Impor / Ekspor Excel / CSV */}
       <ImportExportModal
