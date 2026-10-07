@@ -6,11 +6,29 @@ import { Copy, Check, X, Database, Sparkles, AlertCircle, ShieldAlert } from 'lu
 import { toast } from 'sonner';
 
 const SQL_MIGRATION_ADD_BRANCH_ID = `-- ==============================================================================
--- SKRIP TABEL & ROW LEVEL SECURITY (RLS) SUPABASE - cetak_rekap & list_soft_skill
+-- SKRIP PERBAIKAN DATABASE & ROW LEVEL SECURITY (RLS) SUPABASE
 -- JALANKAN SKRIP INI DI SUPABASE SQL EDITOR (https://supabase.com/dashboard)
 -- ==============================================================================
 
--- 1. TABEL: cetak_rekap
+-- 1. HAPUS TRIGGER PENYALIN DATA OTOMATIS (Mencegah Input Data tercopy ke Data Tambahan)
+DROP TRIGGER IF EXISTS trg_absence_records_to_data_tambahan ON public.absence_records;
+DROP FUNCTION IF EXISTS public.fn_auto_record_to_data_tambahan();
+
+-- 2. TAMBAH KOLOM PENANDA SUMBER_INPUT
+ALTER TABLE public.absence_records ADD COLUMN IF NOT EXISTS sumber_input TEXT DEFAULT 'input_utama';
+ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS sumber_input TEXT DEFAULT 'input_tambahan';
+
+-- Tandai data lama yang merupakan hasil salinan trigger sebagai 'input_utama'
+UPDATE public.data_tambahan
+SET sumber_input = 'input_utama'
+WHERE source_record_id IS NOT NULL;
+
+-- Tandai data murni tambahan sebagai 'input_tambahan'
+UPDATE public.data_tambahan
+SET sumber_input = 'input_tambahan'
+WHERE source_record_id IS NULL AND (sumber_input IS NULL OR sumber_input != 'input_utama');
+
+-- 3. TABEL: cetak_rekap
 CREATE TABLE IF NOT EXISTS public.cetak_rekap (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cabang TEXT NOT NULL,
