@@ -126,6 +126,9 @@ export default function CetakPage() {
       membuat_jabatan: 'Training Center Supervisor',
       membuat_nama: 'ROKHMAN',
       mode_gambar: 'hanya_ttd', // 'hanya_ttd' | 'lengkap'
+      ttd_scale: 100, // 80 - 130 (%)
+      ttd_offset_y: 0, // -20 sampai +20 (px)
+      ttd_offset_x: 0, // -30 sampai +30 (px)
     }),
     []
   );
@@ -138,6 +141,9 @@ export default function CetakPage() {
     membuat_jabatan: 'Training Center Supervisor',
     membuat_nama: 'ROKHMAN',
     mode_gambar: 'hanya_ttd',
+    ttd_scale: 100,
+    ttd_offset_y: 0,
+    ttd_offset_x: 0,
   });
   const [isSavingSignerConfig, setIsSavingSignerConfig] = useState(false);
 
@@ -888,12 +894,19 @@ export default function CetakPage() {
             doc.text(config.membuat_jabatan || 'Training Center Supervisor', 167, currentY, { align: 'center', maxWidth: 58 });
             currentY += 5;
 
-            // 2. Gambar 3 TTD di tengah
+            // 2. Gambar 3 TTD di tengah (Selebar 3 Kolom Penuh, Rasio Asli & Penyesuaian Geser/Ukuran)
             try {
               const imgProps = doc.getImageProperties(softSkillImg);
-              let imgH = (imgProps.height * 186) / imgProps.width;
-              if (imgH > 22) imgH = 22;
-              doc.addImage(softSkillImg, 'PNG', 12, currentY, 186, imgH);
+              const scale = (config.ttd_scale || 100) / 100;
+              const targetWidth = 186 * scale;
+              const imgH = (imgProps.height * targetWidth) / imgProps.width;
+              // Konversi offset px ke mm: 1 px ≈ 0.264583 mm
+              const offsetX = ((config.ttd_offset_x || 0) * 0.264583);
+              const offsetY = ((config.ttd_offset_y || 0) * 0.264583);
+              const xPos = 12 + (186 - targetWidth) / 2 + offsetX;
+              const yPos = currentY + offsetY;
+
+              doc.addImage(softSkillImg, 'PNG', xPos, yPos, targetWidth, imgH);
               currentY += imgH + 4;
             } catch (imgErr) {
               console.error('Gagal menambahkan gambar 3 TTD ke PDF:', imgErr);
@@ -1647,6 +1660,130 @@ export default function CetakPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Pilihan Mode Gambar & Penyesuaian Halus Posisi (Hanya Mode Hanya TTD) */}
+              <div className="pt-2 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs bg-gray-50/80 p-3 rounded-xl border border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <span className="font-bold text-gray-700">Tipe Gambar Paket:</span>
+                  <div className="inline-flex p-0.5 bg-white rounded-lg border border-gray-300">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          mode_gambar: 'hanya_ttd',
+                        }))
+                      }
+                      className={`px-3 py-1 font-bold rounded text-xs transition-colors ${
+                        softSkillSignerConfig.mode_gambar !== 'lengkap'
+                          ? 'bg-[#0056b3] text-white shadow-2xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Hanya Goresan TTD
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          mode_gambar: 'lengkap',
+                        }))
+                      }
+                      className={`px-3 py-1 font-bold rounded text-xs transition-colors ${
+                        softSkillSignerConfig.mode_gambar === 'lengkap'
+                          ? 'bg-[#0056b3] text-white shadow-2xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Gambar Sudah Lengkap (Tabel &amp; Nama)
+                    </button>
+                  </div>
+                </div>
+
+                {softSkillSignerConfig.mode_gambar !== 'lengkap' && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Slider Ukuran */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-gray-600 text-[11px]">Ukuran:</span>
+                      <input
+                        type="range"
+                        min="80"
+                        max="130"
+                        value={softSkillSignerConfig.ttd_scale ?? 100}
+                        onChange={(e) =>
+                          setSoftSkillSignerConfig((prev) => ({
+                            ...prev,
+                            ttd_scale: Number(e.target.value),
+                          }))
+                        }
+                        className="w-20 h-1.5 bg-gray-300 rounded-lg accent-[#0056b3] cursor-pointer"
+                      />
+                      <span className="font-mono text-[11px] font-bold text-gray-800 w-8">
+                        {softSkillSignerConfig.ttd_scale ?? 100}%
+                      </span>
+                    </div>
+
+                    {/* Slider Geser Vertikal */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-gray-600 text-[11px]">Vertikal:</span>
+                      <input
+                        type="range"
+                        min="-20"
+                        max="20"
+                        value={softSkillSignerConfig.ttd_offset_y ?? 0}
+                        onChange={(e) =>
+                          setSoftSkillSignerConfig((prev) => ({
+                            ...prev,
+                            ttd_offset_y: Number(e.target.value),
+                          }))
+                        }
+                        className="w-16 h-1.5 bg-gray-300 rounded-lg accent-[#0056b3] cursor-pointer"
+                      />
+                      <span className="font-mono text-[11px] font-bold text-gray-800 w-7">
+                        {softSkillSignerConfig.ttd_offset_y ?? 0}px
+                      </span>
+                    </div>
+
+                    {/* Slider Geser Horizontal */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-gray-600 text-[11px]">Horizontal:</span>
+                      <input
+                        type="range"
+                        min="-30"
+                        max="30"
+                        value={softSkillSignerConfig.ttd_offset_x ?? 0}
+                        onChange={(e) =>
+                          setSoftSkillSignerConfig((prev) => ({
+                            ...prev,
+                            ttd_offset_x: Number(e.target.value),
+                          }))
+                        }
+                        className="w-16 h-1.5 bg-gray-300 rounded-lg accent-[#0056b3] cursor-pointer"
+                      />
+                      <span className="font-mono text-[11px] font-bold text-gray-800 w-7">
+                        {softSkillSignerConfig.ttd_offset_x ?? 0}px
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSoftSkillSignerConfig((prev) => ({
+                          ...prev,
+                          ttd_scale: 100,
+                          ttd_offset_y: 0,
+                          ttd_offset_x: 0,
+                        }))
+                      }
+                      className="px-2 py-0.5 text-[11px] font-semibold text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                      title="Reset slider ukuran dan posisi ke default"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1815,6 +1952,9 @@ export default function CetakPage() {
           <PanelUploadTtd
             ttdRecords={ttdRecords}
             printFormat={printFormat}
+            modeGambar={softSkillSignerConfig.mode_gambar}
+            signerConfig={softSkillSignerConfig}
+            onSignerConfigChange={setSoftSkillSignerConfig}
             userRole={meta?.userRole || 'admin_cabang'}
             branchName={selectedBranchObj?.name || meta?.userBranchName || ''}
             branchId={branchId}

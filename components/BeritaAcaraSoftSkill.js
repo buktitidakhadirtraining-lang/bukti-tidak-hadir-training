@@ -21,6 +21,9 @@ export default function BeritaAcaraSoftSkill({
     membuat_jabatan = 'Training Center Supervisor',
     membuat_nama = 'ROKHMAN',
     mode_gambar = 'hanya_ttd',
+    ttd_scale = 100,
+    ttd_offset_y = 0,
+    ttd_offset_x = 0,
   } = signerConfig;
 
   const hasSoftSkillTtd = Boolean(ttdImages?.paket_ttd_softskill);
@@ -210,19 +213,22 @@ export default function BeritaAcaraSoftSkill({
             </div>
           </div>
 
-          {/* Area Tanda Tangan Tengah */}
+          {/* Area Tanda Tangan Tengah (Selebar 3 Kolom Penuh) */}
           {ttdMode === 'ada' && hasSoftSkillTtd ? (
-            <div className="w-full my-1.5 flex items-center justify-center">
+            <div className="w-full my-2 flex items-center justify-center relative overflow-visible">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={ttdImages.paket_ttd_softskill}
                 alt="3 Goresan Tanda Tangan Soft Skill"
-                className="w-full max-h-[85px] object-contain mx-auto block"
+                className="h-auto object-contain mx-auto block"
                 style={{
-                  width: '100%',
-                  maxWidth: '100%',
-                  maxHeight: '85px',
-                  objectFit: 'contain',
+                  width: `${ttd_scale}%`,
+                  maxWidth: `${ttd_scale}%`,
+                  height: 'auto',
+                  display: 'block',
+                  transform: `translate(${ttd_offset_x}px, ${ttd_offset_y}px)`,
+                  transformOrigin: 'center center',
+                  transition: 'transform 0.1s ease-out, width 0.1s ease-out',
                 }}
               />
             </div>

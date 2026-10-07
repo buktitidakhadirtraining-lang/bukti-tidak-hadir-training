@@ -18,6 +18,9 @@ export const DEFAULT_SOFT_SKILL_CONFIG = {
   membuat_jabatan: 'Training Center Supervisor',
   membuat_nama: 'ROKHMAN',
   mode_gambar: 'hanya_ttd', // 'hanya_ttd' | 'lengkap'
+  ttd_scale: 100, // 80 - 130 (%)
+  ttd_offset_y: 0, // -20 sampai +20 (px)
+  ttd_offset_x: 0, // -30 sampai +30 (px)
 };
 
 /**
@@ -168,6 +171,9 @@ export async function POST(request) {
         membuat_jabatan: data.membuat_jabatan?.trim() || DEFAULT_SOFT_SKILL_CONFIG.membuat_jabatan,
         membuat_nama: data.membuat_nama?.trim() || DEFAULT_SOFT_SKILL_CONFIG.membuat_nama,
         mode_gambar: data.mode_gambar === 'lengkap' ? 'lengkap' : 'hanya_ttd',
+        ttd_scale: typeof data.ttd_scale === 'number' ? Math.max(80, Math.min(130, data.ttd_scale)) : 100,
+        ttd_offset_y: typeof data.ttd_offset_y === 'number' ? Math.max(-20, Math.min(20, data.ttd_offset_y)) : 0,
+        ttd_offset_x: typeof data.ttd_offset_x === 'number' ? Math.max(-30, Math.min(30, data.ttd_offset_x)) : 0,
       },
       updated_by: isValidUuid(session.userId) ? session.userId : null,
       updated_at: new Date().toISOString(),
