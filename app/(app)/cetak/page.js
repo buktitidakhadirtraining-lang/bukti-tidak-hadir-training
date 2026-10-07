@@ -578,81 +578,84 @@ export default function CetakPage() {
         doc.text(tanggalCetak, 198, currentY, { align: 'right' });
         currentY += 5;
 
-        autoTable(doc, {
-          startY: currentY,
-          head: [[
-            { content: 'Mengetahui,', colSpan: 3, styles: { halign: 'center', fontStyle: 'bold' } },
-            { content: 'Dibuat oleh,', colSpan: 1, styles: { halign: 'center', fontStyle: 'bold' } }
-          ]],
-          body: [[
-            'DBM Operasional',
-            'DBM Admin',
-            'HRD Manager',
-            'TC Supervisor'
-          ]],
-          theme: 'grid',
-          margin: { left: 12, right: 12 },
-          styles: {
-            font: 'helvetica',
-            fontSize: 9,
-            fontStyle: 'bold',
-            halign: 'center',
-            lineWidth: 0.2,
-            lineColor: [0, 0, 0],
-            cellPadding: 2,
-          },
-          headStyles: {
-            fillColor: [255, 255, 255],
-            textColor: [0, 0, 0],
-            lineWidth: 0.2,
-            lineColor: [0, 0, 0],
-            minCellHeight: 6,
-            cellPadding: 1.5,
-            valign: 'middle',
-          },
-          bodyStyles: {
-            minCellHeight: 22,
-            valign: 'bottom',
-            cellPadding: { top: 1, bottom: 2, left: 1, right: 1 },
-          },
-          columnStyles: {
-            0: { cellWidth: 46.5 },
-            1: { cellWidth: 46.5 },
-            2: { cellWidth: 46.5 },
-            3: { cellWidth: 46.5 },
-          },
-          didDrawCell: function (data) {
-            if (data.section === 'body' && data.row.index === 0) {
-              // 1. Gambar garis tanda tangan horizontal tipis (80% lebar kolom, 3-4mm di atas teks nama jabatan)
-              const lineWidth = data.cell.width * 0.8;
-              const lineX1 = data.cell.x + (data.cell.width - lineWidth) / 2;
-              const lineX2 = lineX1 + lineWidth;
-              const lineY = data.cell.y + data.cell.height - 6.2;
+        if (ttdMode === 'ada' && ttdImages?.paket_ttd) {
+          try {
+            const imgProps = doc.getImageProperties(ttdImages.paket_ttd);
+            const targetWidth = 186;
+            let imgHeight = (imgProps.height * targetWidth) / imgProps.width;
 
-              doc.setDrawColor(0, 0, 0);
-              doc.setLineWidth(0.25);
-              doc.line(lineX1, lineY, lineX2, lineY);
-
-              // 2. Jika versi "Ada TTD", gambar TTD besar (82% lebar kolom) berdiri di atas garis
-              if (ttdMode === 'ada') {
-                const roles = ['dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor'];
-                const roleKey = roles[data.column.index];
-                const imgData = ttdImages && ttdImages[roleKey];
-                if (imgData) {
-                  try {
-                    const imgW = data.cell.width * 0.82;
-                    const imgH = 19;
-                    const x = data.cell.x + (data.cell.width - imgW) / 2;
-                    const y = lineY - imgH + 1.2;
-                    doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
-                  } catch (imgErr) {
-                    console.warn('Gagal menambahkan TTD ke PDF:', imgErr);
-                  }
-                }
-              }
+            const maxHeightAvailable = 297 - 12 - currentY;
+            if (imgHeight > maxHeightAvailable && maxHeightAvailable > 15) {
+              const scale = maxHeightAvailable / imgHeight;
+              imgHeight = maxHeightAvailable;
+              const imgWidth = targetWidth * scale;
+              const x = 12 + (targetWidth - imgWidth) / 2;
+              doc.addImage(ttdImages.paket_ttd, 'PNG', x, currentY, imgWidth, imgHeight);
+            } else {
+              doc.addImage(ttdImages.paket_ttd, 'PNG', 12, currentY, targetWidth, imgHeight);
             }
-          },
-        });
+          } catch (imgErr) {
+            console.error('Gagal menambahkan paket TTD ke PDF:', imgErr);
+            doc.addImage(ttdImages.paket_ttd, 'PNG', 12, currentY, 186, 35);
+          }
+        } else {
+          autoTable(doc, {
+            startY: currentY,
+            head: [[
+              { content: 'Mengetahui,', colSpan: 3, styles: { halign: 'center', fontStyle: 'bold' } },
+              { content: 'Dibuat oleh,', colSpan: 1, styles: { halign: 'center', fontStyle: 'bold' } }
+            ]],
+            body: [[
+              'DBM Operasional',
+              'DBM Admin',
+              'HRD Manager',
+              'TC Supervisor'
+            ]],
+            theme: 'grid',
+            margin: { left: 12, right: 12 },
+            styles: {
+              font: 'helvetica',
+              fontSize: 9,
+              fontStyle: 'bold',
+              halign: 'center',
+              lineWidth: 0.2,
+              lineColor: [0, 0, 0],
+              cellPadding: 2,
+            },
+            headStyles: {
+              fillColor: [255, 255, 255],
+              textColor: [0, 0, 0],
+              lineWidth: 0.2,
+              lineColor: [0, 0, 0],
+              minCellHeight: 6,
+              cellPadding: 1.5,
+              valign: 'middle',
+            },
+            bodyStyles: {
+              minCellHeight: 22,
+              valign: 'bottom',
+              cellPadding: { top: 1, bottom: 2, left: 1, right: 1 },
+            },
+            columnStyles: {
+              0: { cellWidth: 46.5 },
+              1: { cellWidth: 46.5 },
+              2: { cellWidth: 46.5 },
+              3: { cellWidth: 46.5 },
+            },
+            didDrawCell: function (data) {
+              if (data.section === 'body' && data.row.index === 0) {
+                const lineWidth = data.cell.width * 0.8;
+                const lineX1 = data.cell.x + (data.cell.width - lineWidth) / 2;
+                const lineX2 = lineX1 + lineWidth;
+                const lineY = data.cell.y + data.cell.height - 6.2;
+
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.25);
+                doc.line(lineX1, lineY, lineX2, lineY);
+              }
+            },
+          });
+        }
 
         doc.save(filename);
         toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });
@@ -748,78 +751,83 @@ export default function CetakPage() {
         doc.text('Demikian berita acara ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.', 12, currentY);
         currentY += 8;
 
-        autoTable(doc, {
-          startY: currentY,
-          head: [[
-            'Mengetahui 2,\nDeputy Branch Manager ADM',
-            'Mengetahui 1,\nHuman Resource Manager',
-            'Membuat,\nTraining Center Supervisor'
-          ]],
-          body: [[
-            'RICKY MARIO',
-            'ABEDNEGO SETYA NUGROHO',
-            'ROKHMAN'
-          ]],
-          theme: 'grid',
-          margin: { left: 12, right: 12 },
-          styles: {
-            font: 'helvetica',
-            fontSize: 9,
-            fontStyle: 'bold',
-            halign: 'center',
-            lineWidth: 0.2,
-            lineColor: [0, 0, 0],
-            cellPadding: 2,
-          },
-          headStyles: {
-            fillColor: [255, 255, 255],
-            textColor: [0, 0, 0],
-            lineWidth: 0.2,
-            lineColor: [0, 0, 0],
-            minCellHeight: 10,
-            cellPadding: 1.5,
-            valign: 'middle',
-          },
-          bodyStyles: {
-            minCellHeight: 22,
-            valign: 'bottom',
-            cellPadding: { top: 1, bottom: 2, left: 1, right: 1 },
-          },
-          columnStyles: {
-            0: { cellWidth: 62 },
-            1: { cellWidth: 62 },
-            2: { cellWidth: 62 },
-          },
-          didDrawCell: function (data) {
-            if (data.section === 'body' && data.row.index === 0) {
-              const lineWidth = data.cell.width * 0.8;
-              const lineX1 = data.cell.x + (data.cell.width - lineWidth) / 2;
-              const lineX2 = lineX1 + lineWidth;
-              const lineY = data.cell.y + data.cell.height - 6.2;
+        if (softSkillTtdMode === 'ada' && ttdImages?.paket_ttd) {
+          try {
+            const imgProps = doc.getImageProperties(ttdImages.paket_ttd);
+            const targetWidth = 186;
+            let imgHeight = (imgProps.height * targetWidth) / imgProps.width;
 
-              doc.setDrawColor(0, 0, 0);
-              doc.setLineWidth(0.25);
-              doc.line(lineX1, lineY, lineX2, lineY);
-
-              if (softSkillTtdMode === 'ada') {
-                const roles = ['dbm_admin', 'hrd_manager', 'tc_supervisor'];
-                const roleKey = roles[data.column.index];
-                const imgData = ttdImages && ttdImages[roleKey];
-                if (imgData) {
-                  try {
-                    const imgW = data.cell.width * 0.8;
-                    const imgH = 20;
-                    const x = data.cell.x + (data.cell.width - imgW) / 2;
-                    const y = lineY - imgH + 1.2;
-                    doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
-                  } catch (imgErr) {
-                    console.warn('Gagal menambahkan TTD Soft Skill ke PDF:', imgErr);
-                  }
-                }
-              }
+            const maxHeightAvailable = 297 - 12 - currentY;
+            if (imgHeight > maxHeightAvailable && maxHeightAvailable > 15) {
+              const scale = maxHeightAvailable / imgHeight;
+              imgHeight = maxHeightAvailable;
+              const imgWidth = targetWidth * scale;
+              const x = 12 + (targetWidth - imgWidth) / 2;
+              doc.addImage(ttdImages.paket_ttd, 'PNG', x, currentY, imgWidth, imgHeight);
+            } else {
+              doc.addImage(ttdImages.paket_ttd, 'PNG', 12, currentY, targetWidth, imgHeight);
             }
-          },
-        });
+          } catch (imgErr) {
+            console.error('Gagal menambahkan paket TTD ke PDF Soft Skill:', imgErr);
+            doc.addImage(ttdImages.paket_ttd, 'PNG', 12, currentY, 186, 35);
+          }
+        } else {
+          autoTable(doc, {
+            startY: currentY,
+            head: [[
+              'Mengetahui 2,\nDeputy Branch Manager ADM',
+              'Mengetahui 1,\nHuman Resource Manager',
+              'Membuat,\nTraining Center Supervisor'
+            ]],
+            body: [[
+              'RICKY MARIO',
+              'ABEDNEGO SETYA NUGROHO',
+              'ROKHMAN'
+            ]],
+            theme: 'grid',
+            margin: { left: 12, right: 12 },
+            styles: {
+              font: 'helvetica',
+              fontSize: 9,
+              fontStyle: 'bold',
+              halign: 'center',
+              lineWidth: 0.2,
+              lineColor: [0, 0, 0],
+              cellPadding: 2,
+            },
+            headStyles: {
+              fillColor: [255, 255, 255],
+              textColor: [0, 0, 0],
+              lineWidth: 0.2,
+              lineColor: [0, 0, 0],
+              minCellHeight: 10,
+              cellPadding: 1.5,
+              valign: 'middle',
+            },
+            bodyStyles: {
+              minCellHeight: 22,
+              valign: 'bottom',
+              cellPadding: { top: 1, bottom: 2, left: 1, right: 1 },
+            },
+            columnStyles: {
+              0: { cellWidth: 62 },
+              1: { cellWidth: 62 },
+              2: { cellWidth: 62 },
+            },
+            didDrawCell: function (data) {
+              if (data.section === 'body' && data.row.index === 0) {
+                const lineWidth = data.cell.width * 0.8;
+                const lineX1 = data.cell.x + (data.cell.width - lineWidth) / 2;
+                const lineX2 = lineX1 + lineWidth;
+                const lineY = data.cell.y + data.cell.height - 6.2;
+
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.25);
+                doc.line(lineX1, lineY, lineX2, lineY);
+              }
+            },
+          });
+        }
 
         doc.save(filename);
         toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });

@@ -116,11 +116,11 @@ CREATE POLICY "Delete list_soft_skill per cabang" ON public.list_soft_skill
     FOR DELETE USING (true);
 
 
--- 3. TABEL: ttd_cabang (Menyimpan Tanda Tangan Resmi per Cabang & Peran)
+-- 3. TABEL: ttd_cabang (Menyimpan Tanda Tangan Resmi per Cabang & Peran / Paket)
 CREATE TABLE IF NOT EXISTS public.ttd_cabang (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cabang TEXT NOT NULL,
-    peran TEXT NOT NULL CHECK (peran IN ('dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor')),
+    peran TEXT NOT NULL,
     drive_file_id TEXT NOT NULL,
     file_name TEXT,
     mime_type TEXT DEFAULT 'image/png',
@@ -129,7 +129,8 @@ CREATE TABLE IF NOT EXISTS public.ttd_cabang (
     UNIQUE (cabang, peran)
 );
 
--- Hapus constraint foreign key kaku ke auth.users jika tabel sudah pernah dibuat sebelumnya
+-- Hapus constraint lama jika tabel sudah pernah dibuat sebelumnya agar mendukung peran 'paket_ttd'
+ALTER TABLE public.ttd_cabang DROP CONSTRAINT IF EXISTS ttd_cabang_peran_check;
 ALTER TABLE public.ttd_cabang DROP CONSTRAINT IF EXISTS ttd_cabang_updated_by_fkey;
 
 CREATE INDEX IF NOT EXISTS idx_ttd_cabang_lookup ON public.ttd_cabang (cabang, peran);

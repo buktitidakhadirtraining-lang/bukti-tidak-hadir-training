@@ -176,250 +176,131 @@ export default function BeritaAcaraRekap({
         <p>{tanggalCetak}</p>
       </div>
 
-      {/* 8. Kotak Tanda Tangan 4 Kolom (Sesuai Gambar 2 & Gambar 3) */}
-      <div className="overflow-x-auto print-break-avoid" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-        <table
-          className="w-full text-center border-collapse"
-          style={{ border: '0.75px solid #000000', fontSize: '11px' }}
-        >
-          <thead>
-            <tr>
-              <th
-                colSpan={3}
-                className="p-1 font-bold"
-                style={{ border: '0.75px solid #000000', width: '75%' }}
-              >
-                Mengetahui,
-              </th>
-              <th
-                className="p-1 font-bold"
-                style={{ border: '0.75px solid #000000', width: '25%' }}
-              >
-                Dibuat oleh,
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              {/* Kolom 1: DBM Operasional */}
-              <td
-                className="p-1 align-bottom relative"
-                style={{
-                  border: '0.75px solid #000000',
-                  width: '25%',
-                  position: 'relative',
-                  overflow: 'visible',
-                }}
-              >
-                {/* Spacer penahan tinggi baris agar ukuran tabel 100% konsisten */}
-                <div className="h-16 w-full" />
-
-                {/* Garis tanda tangan horizontal tipis di atas nama jabatan (80% lebar kolom, rata tengah) */}
-                <div
-                  className="mx-auto w-[80%] mb-1"
-                  style={{ borderTop: '0.75px solid #000000' }}
-                />
-
-                {/* Teks Nama Jabatan */}
-                <div className="px-1 pb-0.5">
-                  <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
-                    DBM Operasional
-                  </span>
-                </div>
-
-                {/* Gambar TTD besar mengambang absolut di atas garis (kaki menyentuh/sedikit melewati garis) */}
-                {ttdMode === 'ada' && ttdImages?.dbm_operasional && (
+      {/* 8. Kotak Tanda Tangan: Paket TTD Tunggal (Ada TTD) atau Tabel Bawaan Kosong (TTD Kosong) */}
+      {ttdMode === 'ada' && ttdImages?.paket_ttd ? (
+        <div className="w-full print-break-avoid" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={ttdImages.paket_ttd}
+            alt="Blok Paket Tanda Tangan Cabang"
+            className="w-full h-auto object-contain mx-auto block rounded-xs shadow-xs"
+            style={{
+              width: '100%',
+              maxWidth: '100%',
+              height: 'auto',
+              display: 'block',
+            }}
+          />
+        </div>
+      ) : (
+        <div className="overflow-x-auto print-break-avoid" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+          <table
+            className="w-full text-center border-collapse"
+            style={{ border: '0.75px solid #000000', fontSize: '11px' }}
+          >
+            <thead>
+              <tr>
+                <th
+                  colSpan={3}
+                  className="p-1 font-bold"
+                  style={{ border: '0.75px solid #000000', width: '75%' }}
+                >
+                  Mengetahui,
+                </th>
+                <th
+                  className="p-1 font-bold"
+                  style={{ border: '0.75px solid #000000', width: '25%' }}
+                >
+                  Dibuat oleh,
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {/* Kolom 1: DBM Operasional */}
+                <td
+                  className="p-1 align-bottom relative"
+                  style={{
+                    border: '0.75px solid #000000',
+                    width: '25%',
+                  }}
+                >
+                  <div className="h-16 w-full" />
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
-                    style={{
-                      bottom: '16px',
-                      width: '80%',
-                      height: '75px',
-                      zIndex: 10,
-                      overflow: 'visible',
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={ttdImages.dbm_operasional}
-                      alt="TTD DBM Operasional"
-                      crossOrigin="anonymous"
-                      className="w-full h-full object-contain mx-auto"
-                      style={{
-                        objectFit: 'contain',
-                        objectPosition: 'bottom center',
-                        mixBlendMode: 'multiply',
-                      }}
-                    />
+                    className="mx-auto w-[80%] mb-1"
+                    style={{ borderTop: '0.75px solid #000000' }}
+                  />
+                  <div className="px-1 pb-0.5">
+                    <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
+                      DBM Operasional
+                    </span>
                   </div>
-                )}
-              </td>
+                </td>
 
-              {/* Kolom 2: DBM Admin */}
-              <td
-                className="p-1 align-bottom relative"
-                style={{
-                  border: '0.75px solid #000000',
-                  width: '25%',
-                  position: 'relative',
-                  overflow: 'visible',
-                }}
-              >
-                <div className="h-16 w-full" />
-
-                <div
-                  className="mx-auto w-[80%] mb-1"
-                  style={{ borderTop: '0.75px solid #000000' }}
-                />
-
-                <div className="px-1 pb-0.5">
-                  <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
-                    DBM Admin
-                  </span>
-                </div>
-
-                {ttdMode === 'ada' && ttdImages?.dbm_admin && (
+                {/* Kolom 2: DBM Admin */}
+                <td
+                  className="p-1 align-bottom relative"
+                  style={{
+                    border: '0.75px solid #000000',
+                    width: '25%',
+                  }}
+                >
+                  <div className="h-16 w-full" />
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
-                    style={{
-                      bottom: '16px',
-                      width: '80%',
-                      height: '75px',
-                      zIndex: 10,
-                      overflow: 'visible',
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={ttdImages.dbm_admin}
-                      alt="TTD DBM Admin"
-                      crossOrigin="anonymous"
-                      className="w-full h-full object-contain mx-auto"
-                      style={{
-                        objectFit: 'contain',
-                        objectPosition: 'bottom center',
-                        mixBlendMode: 'multiply',
-                      }}
-                    />
+                    className="mx-auto w-[80%] mb-1"
+                    style={{ borderTop: '0.75px solid #000000' }}
+                  />
+                  <div className="px-1 pb-0.5">
+                    <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
+                      DBM Admin
+                    </span>
                   </div>
-                )}
-              </td>
+                </td>
 
-              {/* Kolom 3: HRD Manager */}
-              <td
-                className="p-1 align-bottom relative"
-                style={{
-                  border: '0.75px solid #000000',
-                  width: '25%',
-                  position: 'relative',
-                  overflow: 'visible',
-                }}
-              >
-                <div className="h-16 w-full" />
-
-                <div
-                  className="mx-auto w-[80%] mb-1"
-                  style={{ borderTop: '0.75px solid #000000' }}
-                />
-
-                <div className="px-1 pb-0.5">
-                  <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
-                    HRD Manager
-                  </span>
-                </div>
-
-                {ttdMode === 'ada' && ttdImages?.hrd_manager && (
+                {/* Kolom 3: HRD Manager */}
+                <td
+                  className="p-1 align-bottom relative"
+                  style={{
+                    border: '0.75px solid #000000',
+                    width: '25%',
+                  }}
+                >
+                  <div className="h-16 w-full" />
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
-                    style={{
-                      bottom: '16px',
-                      width: '80%',
-                      height: '75px',
-                      zIndex: 10,
-                      overflow: 'visible',
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={ttdImages.hrd_manager}
-                      alt="TTD HRD Manager"
-                      crossOrigin="anonymous"
-                      className="w-full h-full object-contain mx-auto"
-                      style={{
-                        objectFit: 'contain',
-                        objectPosition: 'bottom center',
-                        mixBlendMode: 'multiply',
-                      }}
-                    />
+                    className="mx-auto w-[80%] mb-1"
+                    style={{ borderTop: '0.75px solid #000000' }}
+                  />
+                  <div className="px-1 pb-0.5">
+                    <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
+                      HRD Manager
+                    </span>
                   </div>
-                )}
-              </td>
+                </td>
 
-              {/* Kolom 4: TC Supervisor */}
-              <td
-                className="p-1 align-bottom relative"
-                style={{
-                  border: '0.75px solid #000000',
-                  width: '25%',
-                  position: 'relative',
-                  overflow: 'visible',
-                }}
-              >
-                <div className="h-16 w-full" />
-
-                <div
-                  className="mx-auto w-[80%] mb-1"
-                  style={{ borderTop: '0.75px solid #000000' }}
-                />
-
-                <div className="px-1 pb-0.5">
-                  <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
-                    TC Supervisor
-                  </span>
-                </div>
-
-                {ttdMode === 'ada' && ttdImages?.tc_supervisor && (
+                {/* Kolom 4: TC Supervisor */}
+                <td
+                  className="p-1 align-bottom relative"
+                  style={{
+                    border: '0.75px solid #000000',
+                    width: '25%',
+                  }}
+                >
+                  <div className="h-16 w-full" />
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
-                    style={{
-                      bottom: '16px',
-                      width: '80%',
-                      height: '75px',
-                      zIndex: 10,
-                      overflow: 'visible',
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={ttdImages.tc_supervisor}
-                      alt="TTD TC Supervisor"
-                      crossOrigin="anonymous"
-                      className="w-full h-full object-contain mx-auto"
-                      style={{
-                        objectFit: 'contain',
-                        objectPosition: 'bottom center',
-                        mixBlendMode: 'multiply',
-                      }}
-                    />
+                    className="mx-auto w-[80%] mb-1"
+                    style={{ borderTop: '0.75px solid #000000' }}
+                  />
+                  <div className="px-1 pb-0.5">
+                    <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
+                      TC Supervisor
+                    </span>
                   </div>
-                )}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

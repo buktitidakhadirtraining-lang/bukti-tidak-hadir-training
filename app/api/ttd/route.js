@@ -7,7 +7,7 @@ import { driveUpload, driveGetFile, driveTrash } from '../../../lib/drive.js';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const VALID_PERAN = ['dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor'];
+const VALID_PERAN = ['paket_ttd', 'dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor'];
 
 // Cache in-memory untuk menyimpan data base64 gambar TTD per drive_file_id selama sesi server
 const ttdImageCache = new Map();
@@ -201,12 +201,15 @@ export async function POST(request) {
       );
     }
 
-    // Format nama file: TTD_<KODE_CABANG>_<PERAN>_<timestamp>.png
+    // Format nama file: TTD_PAKET_<KODE_CABANG>_<timestamp>.png atau TTD_<KODE_CABANG>_<PERAN>_<timestamp>.png
     const branchCode = (branch.code || 'CAB').toUpperCase();
-    const cleanPeran = peran.trim().toLowerCase();
+    const cleanPeran = (peran || 'paket_ttd').trim().toLowerCase();
     const peranUpper = cleanPeran.toUpperCase();
     const timestamp = Math.floor(Date.now() / 1000);
-    const standardFileName = `TTD_${branchCode}_${peranUpper}_${timestamp}.png`;
+    const standardFileName =
+      cleanPeran === 'paket_ttd'
+        ? `TTD_PAKET_${branchCode}_${timestamp}.png`
+        : `TTD_${branchCode}_${peranUpper}_${timestamp}.png`;
 
     // Ambil record lama jika ada untuk keperluan "Ganti" (upload baru dulu, jika sukses baru trash yang lama)
     const { data: existingRecord } = await supabase

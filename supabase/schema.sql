@@ -314,7 +314,7 @@ create table if not exists cetak_list_tidak_hadir (
 create table if not exists ttd_cabang (
   id uuid primary key default gen_random_uuid(),
   cabang text not null,
-  peran text not null check (peran in ('dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor')),
+  peran text not null,
   drive_file_id text not null,
   file_name text,
   mime_type text default 'image/png',
@@ -323,6 +323,7 @@ create table if not exists ttd_cabang (
   unique (cabang, peran)
 );
 
+alter table ttd_cabang drop constraint if exists ttd_cabang_peran_check;
 alter table ttd_cabang drop constraint if exists ttd_cabang_updated_by_fkey;
 create index if not exists idx_ttd_cabang_lookup on ttd_cabang (cabang, peran);
 
