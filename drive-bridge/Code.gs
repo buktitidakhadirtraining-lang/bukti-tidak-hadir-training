@@ -100,6 +100,7 @@ function doPost(e) {
       case 'listFiles':
         return handleListFiles(rootFolder, payload);
 
+      case 'find':
       case 'findFilesByNik':
         return handleFindFilesByNik(rootFolder, payload);
 
@@ -454,12 +455,12 @@ function handleListFiles(folder, payload) {
 }
 
 /**
- * Aksi: FIND FILES BY NIK (Cari file bukti berdasarkan NIK)
+ * Aksi: FIND / FIND FILES BY NIK (Cari file bukti berdasarkan NIK / prefix)
  */
 function handleFindFilesByNik(folder, payload) {
-  var targetNik = (payload.nik || '').trim();
-  if (!targetNik) {
-    return createJsonResponse({ ok: false, error: 'NIK wajib diisi' }, 400);
+  var targetPrefix = (payload.prefix || payload.nik || '').trim();
+  if (!targetPrefix) {
+    return createJsonResponse({ ok: false, error: 'Prefix pencarian atau NIK wajib diisi' }, 400);
   }
 
   var files = folder.getFiles();
@@ -469,8 +470,9 @@ function handleFindFilesByNik(folder, payload) {
     var file = files.next();
     var name = file.getName();
     var nik = extractNikFromFileName(name);
-    if (nik === targetNik) {
+    if (nik === targetPrefix || name.indexOf(targetPrefix) === 0 || (nik && targetPrefix && nik.indexOf(targetPrefix) !== -1)) {
       matches.push({
+        fileId: file.getId(),
         id: file.getId(),
         name: name,
         mimeType: file.getMimeType(),
@@ -488,7 +490,8 @@ function handleFindFilesByNik(folder, payload) {
 
   return createJsonResponse({
     ok: true,
-    nik: targetNik,
+    prefix: targetPrefix,
+    nik: targetPrefix,
     count: matches.length,
     files: matches,
   });
