@@ -31,29 +31,21 @@ import BeritaAcaraRekap from '../../../components/BeritaAcaraRekap.js';
 import BeritaAcaraSoftSkill from '../../../components/BeritaAcaraSoftSkill.js';
 import LampiranBuktiSoftSkill from '../../../components/LampiranBuktiSoftSkill.js';
 import LampiranListTidakHadir from '../../../components/LampiranListTidakHadir.js';
+import ProofImageDisplay from '../../../components/ProofImageDisplay.js';
+import { photoLoader } from '../../../lib/photo-loader.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 import PanelUploadTtd from '../../../components/PanelUploadTtd.js';
 import ErrorBoundary from '../../../components/ErrorBoundary.js';
 
-// Komponen gambar bukti yang tajam dan aman
-function ProofImage({ recordId, src, alt, onLoaded, cols = 3 }) {
+// Komponen gambar bukti yang tajam, terantre, dan aman
+function ProofImage({ record, recordId, alt, onLoaded, cols = 3 }) {
   const maxHeight = cols === 3 ? '55mm' : '43mm';
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
+    <ProofImageDisplay
+      record={record || { id: recordId }}
       alt={alt}
-      crossOrigin="anonymous"
-      className="max-h-full max-w-full w-auto h-auto object-contain mx-auto"
-      style={{
-        maxHeight: maxHeight,
-        maxWidth: '100%',
-        objectFit: 'contain',
-        imageRendering: 'auto',
-        WebkitPrintColorAdjust: 'exact',
-      }}
-      onLoad={() => onLoaded && onLoaded(recordId)}
-      onError={() => onLoaded && onLoaded(recordId)}
+      maxHeight={maxHeight}
+      onLoaded={onLoaded}
     />
   );
 }
@@ -372,7 +364,16 @@ export default function CetakPage() {
     totalImagesToLoad === 0 ||
     loadedImagesCount >= totalImagesToLoad;
 
-  const handleImageLoaded = useCallback((recordId) => {
+  const [photoCache, setPhotoCache] = useState(() => photoLoader.getAll());
+
+  useEffect(() => {
+    const unsub = photoLoader.subscribe((updatedMap) => {
+      setPhotoCache(updatedMap);
+    });
+    return unsub;
+  }, []);
+
+  const handleImageLoaded = useCallback((recordId, success = true) => {
     setLoadedImageIds((prev) => {
       if (prev.has(recordId)) return prev;
       const next = new Set(prev);
@@ -380,10 +381,6 @@ export default function CetakPage() {
       return next;
     });
   }, []);
-
-  function handlePrint() {
-    window.print();
-  }
 
   // Helper & Pengelompokan Kategori Jabatan Berita Acara Soft Skill (Gambar 6 & 7)
   const isChiefOfStore = useCallback((jabatan) => {
@@ -423,9 +420,54 @@ export default function CetakPage() {
   const softSkillKategoriLabel =
     softSkillCategory === 'chief_of_store' ? 'Chief of Store' : 'Pimpinan Shift';
 
+  // Kumpulkan daftar foto yang gagal dimuat
+  const failedPhotosList = useMemo(() => {
+    const list = [];
+    const relevantRecords =
+      printFormat === 'soft_skill'
+        ? records.filter((r) =>
+            filteredSoftSkillData.some(
+              (p) => String(p.nik).trim() === String(r.nik).trim()
+            )
+          )
+        : records;
+
+    for (const r of relevantRecords) {
+      if (!r.drive_file_id || r.file_mime_type === 'application/pdf') continue;
+      const state = photoCache.get(r.id);
+      if (state && state.status === 'error') {
+        list.push({
+          id: r.id,
+          nik: r.nik,
+          nama: r.nama_peserta,
+          error: state.error || 'Gagal memuat',
+          isHeic: state.isHeic,
+        });
+      }
+    }
+    return list;
+  }, [records, filteredSoftSkillData, printFormat, photoCache]);
+
+  function handlePrint() {
+    if (failedPhotosList.length > 0) {
+      const proceed = window.confirm(
+        `${failedPhotosList.length} foto bukti belum berhasil termuat. Apakah Anda ingin tetap melanjutkan proses Cetak?`
+      );
+      if (!proceed) return;
+    }
+    window.print();
+  }
+
   // Fungsi mengunduh berkas fisik PDF berbasis Teks & Vector (jsPDF + jspdf-autotable)
   async function handleDownloadPdf() {
     if (downloadingPdf) return;
+
+    if (failedPhotosList.length > 0) {
+      const proceed = window.confirm(
+        `${failedPhotosList.length} foto bukti belum berhasil termuat. Apakah Anda ingin tetap melanjutkan proses Unduh PDF?`
+      );
+      if (!proceed) return;
+    }
 
     setDownloadingPdf(true);
     const toastId = toast.loading('Sedang memproses dan membuat berkas PDF...');
@@ -846,8 +888,6 @@ export default function CetakPage() {
         doc.text(`Periode Training : ${softSkillPeriode}`, 12, currentY);
         currentY += 4.5;
         doc.text(`Tanggal Dibuat : ${softSkillTanggalDibuat}`, 12, currentY);
-        currentY += 4.5;
-        doc.text(`Kategori Peserta : ${softSkillKategoriLabel} (${filteredSoftSkillData.length} Peserta)`, 12, currentY);
         currentY += 6;
 
         doc.text('Daftar Peserta Gagal Training:', 12, currentY);
@@ -906,7 +946,7 @@ export default function CetakPage() {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
         doc.text('Demikian berita acara ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.', 12, currentY);
-        currentY += 8;
+        currentY += 10; // Jarak tetap 10mm (1 cm) ke blok tanda tangan
 
         const softSkillImg = ttdImages?.paket_ttd_softskill;
         const config = softSkillSignerConfig || {
@@ -2222,6 +2262,53 @@ export default function CetakPage() {
             isDriveReady={Boolean(selectedBranchObj?.driveReady ?? meta?.userBranchDriveReady ?? true)}
             onTtdUpdated={handleTtdUpdated}
           />
+        </div>
+      )}
+
+      {/* Panel Peringatan Foto Gagal Dimuat (Tidak Tercetak di Kertas) */}
+      {failedPhotosList.length > 0 && (
+        <div className="no-print max-w-4xl mx-auto mb-4 p-3.5 bg-amber-50 border border-amber-300 rounded-xl shadow-xs text-xs text-amber-900">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-amber-200">
+            <div className="flex items-center gap-2 font-bold text-amber-800">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Peringatan: {failedPhotosList.length} Foto Bukti Belum Berhasil Dimuat</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                photoLoader.retryFailed();
+                toast.info('Memulai ulang pemuatan foto bukti...');
+              }}
+              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs w-fit cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Muat Ulang Foto Gagal
+            </button>
+          </div>
+          <div className="mt-2 space-y-1">
+            <p className="font-semibold text-amber-800 text-[11px]">Rincian peserta dengan kendala foto:</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+              {failedPhotosList.map((fp) => (
+                <div
+                  key={fp.id}
+                  className="p-1.5 bg-white/90 rounded border border-amber-200 text-[11px] flex items-start gap-1.5"
+                >
+                  <span className="font-mono font-bold text-gray-800 shrink-0">{fp.nik}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-bold text-gray-900 truncate block">{fp.nama}</span>
+                    <span className="text-red-600 text-[10px] block leading-tight">
+                      {fp.isHeic
+                        ? 'Format HEIC/HEIF tidak didukung browser, ganti dengan JPG/PNG'
+                        : fp.error || '404 file tidak ditemukan di Drive'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-amber-700 italic mt-1">
+              💡 <em>Catatan: Anda tetap dapat mencetak atau mengunduh PDF. Sistem akan memunculkan konfirmasi sebelum proses dijalankan.</em>
+            </p>
+          </div>
         </div>
       )}
 

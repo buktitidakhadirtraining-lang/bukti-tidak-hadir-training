@@ -3,6 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { ImageIcon } from 'lucide-react';
+import ProofImageDisplay from './ProofImageDisplay.js';
 
 function chunkArray(arr, size = 3) {
   if (!arr || arr.length === 0) return [];
@@ -112,26 +113,11 @@ export default function LampiranBuktiSoftSkill({
 
                     {/* Baris c: Kotak Foto Bukti (Contain, utuh & rasio asli) */}
                     <div className="w-full flex-1 min-h-[48mm] max-h-[54mm] border border-black rounded-xs bg-gray-50/50 p-1 flex items-center justify-center overflow-hidden">
-                      {photos.length > 0 ? (
-                        <div className="w-full h-full flex items-center justify-center gap-2 overflow-hidden">
-                          {photos.map((photo, pIdx) => (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              key={photo.id || pIdx}
-                              src={`/api/records/${photo.id}/file`}
-                              alt={`Bukti ${row.nama}`}
-                              crossOrigin="anonymous"
-                              className="max-h-[50mm] max-w-full h-auto w-auto object-contain mx-auto"
-                              style={{ objectFit: 'contain' }}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-gray-400 italic text-[11px] py-3">
-                          <ImageIcon className="w-6 h-6 text-gray-300 mb-1" />
-                          <span>Belum ada bukti foto</span>
-                        </div>
-                      )}
+                      <ProofImageDisplay
+                        records={photos}
+                        alt={`Bukti ${row.nama}`}
+                        maxHeight="50mm"
+                      />
                     </div>
                   </div>
                 );
