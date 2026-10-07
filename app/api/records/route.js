@@ -257,6 +257,8 @@ export async function POST(request) {
         fileName: safeFileName,
         mimeType: file.type,
         base64,
+        nik,
+        cleanOldDuplicates: true,
       });
 
       driveFileData = {

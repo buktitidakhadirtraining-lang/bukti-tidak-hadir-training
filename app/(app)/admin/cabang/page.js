@@ -18,6 +18,9 @@ import {
   Play,
   KeyRound,
   Link2,
+  Sparkles,
+  RefreshCw,
+  FileCheck,
 } from 'lucide-react';
 import ConfirmDialog from '../../../../components/ConfirmDialog.js';
 
@@ -38,6 +41,10 @@ export default function AdminCabangPage() {
 
   // Delete State
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, branch: null, loading: false });
+
+  // Clean Duplicates Maintenance State
+  const [cleanDialog, setCleanDialog] = useState({ isOpen: false, branch: null, loading: false });
+  const [cleanResult, setCleanResult] = useState(null);
 
   async function loadBranches() {
     setLoading(true);
@@ -192,6 +199,33 @@ export default function AdminCabangPage() {
     }
   }
 
+  async function handleRunCleanDuplicates() {
+    const branch = cleanDialog.branch;
+    setCleanDialog((prev) => ({ ...prev, loading: true }));
+
+    const toastId = toast.loading('Sedang memindai dan membersihkan file duplikat di Google Drive...');
+    try {
+      const res = await fetch('/api/admin/clean-drive-duplicates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch_id: branch?.id }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        toast.success(json.message || 'Pembersihan duplikat Google Drive selesai!', { id: toastId });
+        setCleanDialog({ isOpen: false, branch: null, loading: false });
+        setCleanResult(json);
+      } else {
+        toast.error(json.error || 'Gagal menjalankan pembersihan duplikat', { id: toastId });
+        setCleanDialog((prev) => ({ ...prev, loading: false }));
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan jaringan saat membersihkan duplikat: ' + err.message, { id: toastId });
+      setCleanDialog((prev) => ({ ...prev, loading: false }));
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -205,13 +239,24 @@ export default function AdminCabangPage() {
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0056b3] hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-colors min-h-[42px] shrink-0"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>Tambah Cabang Baru</span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setCleanDialog({ isOpen: true, branch: null, loading: false })}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs sm:text-sm font-bold transition-colors min-h-[42px] shrink-0"
+            title="Pindai dan bersihkan file bukti duplikat di seluruh cabang"
+          >
+            <Sparkles className="w-4 h-4 text-amber-600" />
+            <span>Bersihkan Duplikat Drive (Semua)</span>
+          </button>
+
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0056b3] hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-colors min-h-[42px] shrink-0"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Tambah Cabang Baru</span>
+          </button>
+        </div>
       </div>
 
       {/* Table Cabang */}
@@ -231,7 +276,7 @@ export default function AdminCabangPage() {
                   <th className="py-3 px-4">URL Drive Bridge (Apps Script)</th>
                   <th className="py-3 px-4 text-center">Status Drive</th>
                   <th className="py-3 px-4 text-center">Status Aktif</th>
-                  <th className="py-3 px-4 text-center w-28">Aksi</th>
+                  <th className="py-3 px-4 text-center w-36">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -240,7 +285,7 @@ export default function AdminCabangPage() {
                     <td className="py-3.5 px-4 text-center font-bold text-gray-400">{idx + 1}</td>
                     <td className="py-3.5 px-4 font-mono font-bold text-gray-900">{b.code}</td>
                     <td className="py-3.5 px-4 font-semibold text-gray-900">{b.name}</td>
-                    <td className="py-3.5 px-4 font-mono text-gray-500 truncate max-w-[260px]">
+                    <td className="py-3.5 px-4 font-mono text-gray-500 truncate max-w-[240px]">
                       {b.drive_bridge_url ? (
                         <span title={b.drive_bridge_url} className="text-gray-600">
                           {b.drive_bridge_url}
@@ -275,6 +320,15 @@ export default function AdminCabangPage() {
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        {b.has_drive_bridge && (
+                          <button
+                            onClick={() => setCleanDialog({ isOpen: true, branch: b, loading: false })}
+                            className="p-1.5 text-amber-700 hover:text-amber-900 hover:bg-amber-100/80 rounded-lg transition-colors"
+                            title="Bersihkan Duplikat & Sinkronkan File Drive Cabang Ini"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => openEditModal(b)}
                           className="p-1.5 text-gray-500 hover:text-[#0056b3] hover:bg-blue-50 rounded-lg transition-colors"
@@ -479,6 +533,141 @@ export default function AdminCabangPage() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteDialog({ isOpen: false, branch: null, loading: false })}
       />
+
+      {/* Clean Duplicates Confirmation */}
+      <ConfirmDialog
+        isOpen={cleanDialog.isOpen}
+        title={cleanDialog.branch ? `Bersihkan Duplikat Drive: ${cleanDialog.branch.name}` : 'Bersihkan Duplikat Drive (Semua Cabang)'}
+        message={
+          cleanDialog.branch
+            ? `Sistem akan memindai folder Google Drive cabang "${cleanDialog.branch.name}". Untuk setiap NIK yang memiliki lebih dari 1 file foto bukti, file paling baru akan dipertahankan dan file-file lama dipindahkan ke tempat sampah Drive. Database juga akan disinkronkan otomatis. Lanjutkan?`
+            : 'Sistem akan memindai folder Google Drive di SEMUA cabang yang terhubung. File-file foto lama yang berduplikat per NIK akan dipindahkan ke tempat sampah Drive dan database akan disinkronkan. Lanjutkan?'
+        }
+        confirmText="Ya, Jalankan Pembersihan"
+        cancelText="Batal"
+        danger={false}
+        isLoading={cleanDialog.loading}
+        onConfirm={handleRunCleanDuplicates}
+        onCancel={() => setCleanDialog({ isOpen: false, branch: null, loading: false })}
+      />
+
+      {/* Modal Hasil Pembersihan Duplikat */}
+      {cleanResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 max-h-[90vh] flex flex-col">
+            <div className="indomaret-bar">
+              <div className="indomaret-bar-blue" />
+              <div className="indomaret-bar-yellow" />
+              <div className="indomaret-bar-red" />
+            </div>
+
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 font-title">
+                    Hasil Pembersihan Duplikat Google Drive
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Laporan ringkasan pembersihan file ganda dan sinkronisasi database
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCleanResult(null)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+              {/* Statistik Ringkas */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-center">
+                  <div className="text-lg font-black text-blue-900">
+                    {cleanResult.overallSummary?.totalFilesScanned ?? 0}
+                  </div>
+                  <div className="text-[10px] text-blue-700 font-semibold uppercase mt-0.5">Total File Dipindai</div>
+                </div>
+
+                <div className="p-3 bg-amber-50/70 border border-amber-100 rounded-xl text-center">
+                  <div className="text-lg font-black text-amber-900">
+                    {cleanResult.overallSummary?.totalDuplicatesTrashed ?? 0}
+                  </div>
+                  <div className="text-[10px] text-amber-700 font-semibold uppercase mt-0.5">Duplikat ke Sampah</div>
+                </div>
+
+                <div className="p-3 bg-emerald-50/70 border border-emerald-100 rounded-xl text-center">
+                  <div className="text-lg font-black text-emerald-900">
+                    {cleanResult.overallSummary?.totalDbRecordsUpdated ?? 0}
+                  </div>
+                  <div className="text-[10px] text-emerald-700 font-semibold uppercase mt-0.5">Database Disinkronkan</div>
+                </div>
+
+                <div className="p-3 bg-purple-50/70 border border-purple-100 rounded-xl text-center">
+                  <div className="text-lg font-black text-purple-900">
+                    {cleanResult.overallSummary?.totalBranchesProcessed ?? 0}
+                  </div>
+                  <div className="text-[10px] text-purple-700 font-semibold uppercase mt-0.5">Cabang Diproses</div>
+                </div>
+              </div>
+
+              {/* Rincian Cabang */}
+              <div className="space-y-3 pt-2">
+                <h4 className="font-bold text-gray-800 text-xs uppercase tracking-wider">
+                  Rincian Pembersihan per Cabang:
+                </h4>
+
+                {(cleanResult.results || []).map((r, rIdx) => (
+                  <div key={rIdx} className="p-3.5 bg-gray-50/80 rounded-xl border border-gray-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-900">{r.branchName}</span>
+                      {r.ok ? (
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          {r.summary?.duplicateFilesTrashed || 0} duplikat dibersihkan • {r.summary?.dbRecordsUpdated || 0} database diperbarui
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
+                          {r.error || 'Gagal'}
+                        </span>
+                      )}
+                    </div>
+
+                    {r.details && r.details.length > 0 && (
+                      <div className="text-[11px] text-gray-600 bg-white p-2.5 rounded-lg border border-gray-100 max-h-36 overflow-y-auto space-y-1 font-mono">
+                        {r.details.map((d, dIdx) => (
+                          <div key={dIdx} className="flex items-start justify-between gap-2 border-b border-gray-50 pb-1">
+                            <div>
+                              <span className="font-bold text-gray-900">NIK {d.nik}:</span>{' '}
+                              <span className="text-emerald-700">Pertahankan &quot;{d.kept?.name}&quot;</span>
+                            </div>
+                            <span className="text-red-600 shrink-0">
+                              -{(d.trashed || []).length} file lama
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-4 border-t border-gray-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setCleanResult(null)}
+                  className="px-5 py-2 rounded-xl bg-[#0056b3] hover:bg-blue-700 font-bold text-white shadow-xs"
+                >
+                  Tutup Laporan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

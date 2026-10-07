@@ -7,8 +7,11 @@ import { auditLog } from '../../../../lib/audit.js';
 
 export const runtime = 'nodejs';
 
-// PUT: Perbarui catatan ketidakhadiran beserta berkas bukti pengganti
+// PUT: Perbarui catatan ketidakhadiran beserta berkas bukti pengganti (Safe Replace Workflow)
 export async function PUT(request, { params }) {
+  let newlyUploadedFileId = null;
+  let targetBranchForUpload = null;
+
   try {
     const session = await getSessionFromRequest(request);
     if (!session) {
@@ -98,14 +101,21 @@ export async function PUT(request, { params }) {
       updated_at: new Date().toISOString(),
     };
 
-    // Jika ada file bukti baru yang diunggah
+    // Alur Aman Penggantian Berkas Bukti (Safe Replace):
+    // 1. Upload file baru dulu dan pastikan sukses
+    // 2. Update database dengan fileId baru
+    // 3. Jika update DB berhasil, baru hapus file lama di Drive
+    // 4. Jika update DB gagal, hapus file baru (rollback) dan pertahankan file lama
+    let hasNewFile = false;
+    let oldFileToTrash = null;
+
     if (file && typeof file === 'object' && file.size > 0) {
       const validation = validateEvidenceFile(file);
       if (!validation.valid) {
         return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
       }
 
-      // Pastikan target cabang sesuai record (cabang data tersebut, bukan cabang admin)
+      // Pastikan target cabang sesuai record
       const targetBranchId = (session.role === 'admin_pusat' && branch_id) ? branch_id : oldRecord.branch_id;
       const { data: targetBranch } = await supabase
         .from('branches')
@@ -122,30 +132,33 @@ export async function PUT(request, { params }) {
             drive_bridge_secret_enc: 'mock_secret',
           };
 
-      // Hapus file lama di Drive jika ada
-      if (oldRecord.drive_file_id) {
-        try {
-          const oldBranch = oldRecord.branches;
-          if (oldBranch?.drive_bridge_url && oldBranch?.drive_bridge_secret_enc) {
-            await driveTrash(oldBranch, oldRecord.drive_file_id);
-          }
-        } catch (delErr) {
-          console.warn('[Old file trash ignored]:', delErr.message);
-        }
-      }
+      targetBranchForUpload = activeBranch;
 
-      // Unggah file baru ke Drive Bridge cabang target data tersebut
+      // 1. Unggah berkas baru terlebih dahulu
       const arrayBuffer = await file.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString('base64');
       const ext = file.name.split('.').pop() || 'bin';
       const cleanNama = nama_peserta.replace(/[^a-zA-Z0-9_-]/g, '_');
       const safeFileName = `${nik}_BA_${cleanNama}_${tanggal_pelaksanaan}.${ext}`;
 
-      const uploadRes = await driveUpload(targetBranch, {
+      const uploadRes = await driveUpload(activeBranch, {
         fileName: safeFileName,
         mimeType: file.type,
         base64,
+        nik,
+        cleanOldDuplicates: true,
       });
+
+      if (!uploadRes || !uploadRes.fileId) {
+        return NextResponse.json(
+          { ok: false, error: 'Gagal mengunggah foto baru ke Google Drive cabang' },
+          { status: 500 }
+        );
+      }
+
+      newlyUploadedFileId = uploadRes.fileId;
+      hasNewFile = true;
+      oldFileToTrash = oldRecord.drive_file_id;
 
       updatePayload.drive_file_id = uploadRes.fileId;
       updatePayload.drive_file_name = uploadRes.fileName;
@@ -154,6 +167,7 @@ export async function PUT(request, { params }) {
       updatePayload.file_size_bytes = file.size;
     }
 
+    // 2. Simpan pembaruan ke database
     const { data: updatedRecord, error: updateErr } = await supabase
       .from('absence_records')
       .update(updatePayload)
@@ -176,7 +190,7 @@ export async function PUT(request, { params }) {
         branch_id,
         training_id,
         alasan_id,
-        branches ( id, name, code ),
+        branches ( id, name, code, drive_bridge_url, drive_bridge_secret_enc ),
         training_types ( id, name ),
         absence_reasons ( id, name )
       `)
@@ -184,6 +198,17 @@ export async function PUT(request, { params }) {
 
     if (updateErr) {
       console.error('[Record Update Error]:', updateErr);
+
+      // ROLLBACK: Jika update DB gagal setelah file baru terunggah, hapus file baru dari Drive
+      if (hasNewFile && newlyUploadedFileId && targetBranchForUpload) {
+        try {
+          await driveTrash(targetBranchForUpload, newlyUploadedFileId);
+          console.log(`[Drive Rollback] Berhasil membatalkan upload file baru ${newlyUploadedFileId}`);
+        } catch (trashErr) {
+          console.warn('[Drive Rollback Error]:', trashErr.message);
+        }
+      }
+
       if (updateErr.code === '23505') {
         return NextResponse.json(
           { ok: false, error: 'Data untuk NIK ini pada training dan tanggal tersebut sudah ada.' },
@@ -193,19 +218,42 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ ok: false, error: 'Gagal memperbarui catatan: ' + updateErr.message }, { status: 500 });
     }
 
+    // 3. Setelah database SUKSES terupdate, barulah pindahkan file lama ke tempat sampah Google Drive
+    if (hasNewFile && oldFileToTrash && oldFileToTrash !== newlyUploadedFileId) {
+      try {
+        const oldBranch = oldRecord.branches;
+        if (oldBranch?.drive_bridge_url && oldBranch?.drive_bridge_secret_enc) {
+          await driveTrash(oldBranch, oldFileToTrash);
+          console.log(`[Drive Trash] Berhasil memindahkan file lama ${oldFileToTrash} ke sampah`);
+        }
+      } catch (delErr) {
+        console.warn('[Old file trash warning (ignored)]:', delErr.message);
+      }
+    }
+
     await auditLog(session.userId, 'UPDATE_RECORD', {
       recordId: id,
       nik,
       nama: nama_peserta,
+      hasNewFile,
+      newFileId: newlyUploadedFileId,
     });
 
     return NextResponse.json({
       ok: true,
-      message: 'Catatan berhasil diperbarui',
+      message: 'Catatan dan berkas bukti berhasil diperbarui',
       data: updatedRecord,
     });
   } catch (err) {
     console.error('[Record PUT Error]:', err);
+
+    // Rollback jika terjadi exception
+    if (newlyUploadedFileId && targetBranchForUpload) {
+      try {
+        await driveTrash(targetBranchForUpload, newlyUploadedFileId);
+      } catch (trashErr) {}
+    }
+
     return NextResponse.json({ ok: false, error: 'Terjadi kesalahan sistem: ' + err.message }, { status: 500 });
   }
 }
