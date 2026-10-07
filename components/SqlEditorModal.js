@@ -129,9 +129,20 @@ CREATE TABLE IF NOT EXISTS public.ttd_cabang (
     UNIQUE (cabang, peran)
 );
 
--- Hapus constraint lama jika tabel sudah pernah dibuat sebelumnya agar mendukung peran 'paket_ttd'
+-- Hapus constraint lama jika tabel sudah pernah dibuat sebelumnya agar mendukung peran baru ('paket_ttd_rekap', 'paket_ttd_softskill')
 ALTER TABLE public.ttd_cabang DROP CONSTRAINT IF EXISTS ttd_cabang_peran_check;
 ALTER TABLE public.ttd_cabang DROP CONSTRAINT IF EXISTS ttd_cabang_updated_by_fkey;
+
+-- Migrasi data lama: ubah peran 'paket_ttd' menjadi 'paket_ttd_rekap' untuk Berita Acara Rekap
+-- Aman dijalankan ulang: hanya memperbarui record jika belum ada 'paket_ttd_rekap' di cabang bersangkutan
+UPDATE public.ttd_cabang
+SET peran = 'paket_ttd_rekap'
+WHERE peran = 'paket_ttd'
+  AND NOT EXISTS (
+    SELECT 1 FROM public.ttd_cabang t2
+    WHERE t2.cabang = public.ttd_cabang.cabang
+      AND t2.peran = 'paket_ttd_rekap'
+  );
 
 CREATE INDEX IF NOT EXISTS idx_ttd_cabang_lookup ON public.ttd_cabang (cabang, peran);
 ALTER TABLE public.ttd_cabang ENABLE ROW LEVEL SECURITY;

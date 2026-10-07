@@ -7,7 +7,15 @@ import { driveUpload, driveGetFile, driveTrash } from '../../../lib/drive.js';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const VALID_PERAN = ['paket_ttd', 'dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor'];
+const VALID_PERAN = [
+  'paket_ttd_rekap',
+  'paket_ttd_softskill',
+  'paket_ttd', // backward-compatibility
+  'dbm_operasional',
+  'dbm_admin',
+  'hrd_manager',
+  'tc_supervisor',
+];
 
 // Cache in-memory untuk menyimpan data base64 gambar TTD per drive_file_id selama sesi server
 const ttdImageCache = new Map();
@@ -201,15 +209,21 @@ export async function POST(request) {
       );
     }
 
-    // Format nama file: TTD_PAKET_<KODE_CABANG>_<timestamp>.png atau TTD_<KODE_CABANG>_<PERAN>_<timestamp>.png
+    // Format nama file: TTD_PAKET_REKAP_<KODE_CABANG>_<timestamp>.png atau TTD_PAKET_SOFTSKILL_<KODE_CABANG>_<timestamp>.png
     const branchCode = (branch.code || 'CAB').toUpperCase();
-    const cleanPeran = (peran || 'paket_ttd').trim().toLowerCase();
+    const cleanPeran = (peran || '').trim().toLowerCase();
     const peranUpper = cleanPeran.toUpperCase();
     const timestamp = Math.floor(Date.now() / 1000);
-    const standardFileName =
-      cleanPeran === 'paket_ttd'
-        ? `TTD_PAKET_${branchCode}_${timestamp}.png`
-        : `TTD_${branchCode}_${peranUpper}_${timestamp}.png`;
+    let standardFileName;
+    if (cleanPeran === 'paket_ttd_rekap') {
+      standardFileName = `TTD_PAKET_REKAP_${branchCode}_${timestamp}.png`;
+    } else if (cleanPeran === 'paket_ttd_softskill') {
+      standardFileName = `TTD_PAKET_SOFTSKILL_${branchCode}_${timestamp}.png`;
+    } else if (cleanPeran === 'paket_ttd') {
+      standardFileName = `TTD_PAKET_REKAP_${branchCode}_${timestamp}.png`;
+    } else {
+      standardFileName = `TTD_${branchCode}_${peranUpper}_${timestamp}.png`;
+    }
 
     // Ambil record lama jika ada untuk keperluan "Ganti" (upload baru dulu, jika sukses baru trash yang lama)
     const { data: existingRecord } = await supabase
@@ -218,6 +232,18 @@ export async function POST(request) {
       .ilike('cabang', branch.name.trim())
       .eq('peran', cleanPeran)
       .maybeSingle();
+
+    // Jika upload paket_ttd_rekap dan belum ada record paket_ttd_rekap, cek record paket_ttd lama untuk di-cleanup
+    let legacyRecord = null;
+    if (cleanPeran === 'paket_ttd_rekap' && !existingRecord) {
+      const { data: leg } = await supabase
+        .from('ttd_cabang')
+        .select('id, drive_file_id')
+        .ilike('cabang', branch.name.trim())
+        .eq('peran', 'paket_ttd')
+        .maybeSingle();
+      legacyRecord = leg;
+    }
 
     // 1. Upload file baru ke Google Drive cabang
     let uploadResult;
@@ -284,6 +310,16 @@ export async function POST(request) {
         await driveTrash(branch, existingRecord.drive_file_id);
       } catch (trashErr) {
         console.warn('[POST /api/ttd] Gagal memindahkan file lama ke sampah (diabaikan):', trashErr.message);
+      }
+    }
+
+    if (legacyRecord?.drive_file_id && legacyRecord.drive_file_id !== uploadResult.fileId) {
+      try {
+        ttdImageCache.delete(legacyRecord.drive_file_id);
+        await driveTrash(branch, legacyRecord.drive_file_id);
+        await supabase.from('ttd_cabang').delete().eq('id', legacyRecord.id);
+      } catch (trashErr) {
+        console.warn('[POST /api/ttd] Gagal membersihkan record legacy:', trashErr.message);
       }
     }
 

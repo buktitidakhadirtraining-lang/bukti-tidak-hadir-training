@@ -578,9 +578,10 @@ export default function CetakPage() {
         doc.text(tanggalCetak, 198, currentY, { align: 'right' });
         currentY += 5;
 
-        if (ttdMode === 'ada' && ttdImages?.paket_ttd) {
+        const rekapImg = ttdImages?.paket_ttd_rekap || ttdImages?.paket_ttd;
+        if (ttdMode === 'ada' && rekapImg) {
           try {
-            const imgProps = doc.getImageProperties(ttdImages.paket_ttd);
+            const imgProps = doc.getImageProperties(rekapImg);
             const targetWidth = 186;
             let imgHeight = (imgProps.height * targetWidth) / imgProps.width;
 
@@ -590,13 +591,13 @@ export default function CetakPage() {
               imgHeight = maxHeightAvailable;
               const imgWidth = targetWidth * scale;
               const x = 12 + (targetWidth - imgWidth) / 2;
-              doc.addImage(ttdImages.paket_ttd, 'PNG', x, currentY, imgWidth, imgHeight);
+              doc.addImage(rekapImg, 'PNG', x, currentY, imgWidth, imgHeight);
             } else {
-              doc.addImage(ttdImages.paket_ttd, 'PNG', 12, currentY, targetWidth, imgHeight);
+              doc.addImage(rekapImg, 'PNG', 12, currentY, targetWidth, imgHeight);
             }
           } catch (imgErr) {
             console.error('Gagal menambahkan paket TTD ke PDF:', imgErr);
-            doc.addImage(ttdImages.paket_ttd, 'PNG', 12, currentY, 186, 35);
+            doc.addImage(rekapImg, 'PNG', 12, currentY, 186, 35);
           }
         } else {
           autoTable(doc, {
@@ -751,9 +752,10 @@ export default function CetakPage() {
         doc.text('Demikian berita acara ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.', 12, currentY);
         currentY += 8;
 
-        if (softSkillTtdMode === 'ada' && ttdImages?.paket_ttd) {
+        const softSkillImg = ttdImages?.paket_ttd_softskill;
+        if (softSkillTtdMode === 'ada' && softSkillImg) {
           try {
-            const imgProps = doc.getImageProperties(ttdImages.paket_ttd);
+            const imgProps = doc.getImageProperties(softSkillImg);
             const targetWidth = 186;
             let imgHeight = (imgProps.height * targetWidth) / imgProps.width;
 
@@ -763,13 +765,13 @@ export default function CetakPage() {
               imgHeight = maxHeightAvailable;
               const imgWidth = targetWidth * scale;
               const x = 12 + (targetWidth - imgWidth) / 2;
-              doc.addImage(ttdImages.paket_ttd, 'PNG', x, currentY, imgWidth, imgHeight);
+              doc.addImage(softSkillImg, 'PNG', x, currentY, imgWidth, imgHeight);
             } else {
-              doc.addImage(ttdImages.paket_ttd, 'PNG', 12, currentY, targetWidth, imgHeight);
+              doc.addImage(softSkillImg, 'PNG', 12, currentY, targetWidth, imgHeight);
             }
           } catch (imgErr) {
             console.error('Gagal menambahkan paket TTD ke PDF Soft Skill:', imgErr);
-            doc.addImage(ttdImages.paket_ttd, 'PNG', 12, currentY, 186, 35);
+            doc.addImage(softSkillImg, 'PNG', 12, currentY, 186, 35);
           }
         } else {
           autoTable(doc, {
@@ -1500,6 +1502,7 @@ export default function CetakPage() {
         <div className="no-print">
           <PanelUploadTtd
             ttdRecords={ttdRecords}
+            printFormat={printFormat}
             userRole={meta?.userRole || 'admin_cabang'}
             branchName={selectedBranchObj?.name || meta?.userBranchName || ''}
             branchId={branchId}

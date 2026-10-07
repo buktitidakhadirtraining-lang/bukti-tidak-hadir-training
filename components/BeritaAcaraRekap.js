@@ -176,13 +176,13 @@ export default function BeritaAcaraRekap({
         <p>{tanggalCetak}</p>
       </div>
 
-      {/* 8. Kotak Tanda Tangan: Paket TTD Tunggal (Ada TTD) atau Tabel Bawaan Kosong (TTD Kosong) */}
-      {ttdMode === 'ada' && ttdImages?.paket_ttd ? (
+      {/* 8. Kotak Tanda Tangan: Paket TTD Tunggal Rekap (Ada TTD) atau Tabel Bawaan Kosong (TTD Kosong) */}
+      {ttdMode === 'ada' && (ttdImages?.paket_ttd_rekap || ttdImages?.paket_ttd) ? (
         <div className="w-full print-break-avoid" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={ttdImages.paket_ttd}
-            alt="Blok Paket Tanda Tangan Cabang"
+            src={ttdImages.paket_ttd_rekap || ttdImages.paket_ttd}
+            alt="Blok Paket Tanda Tangan Berita Acara Rekap"
             className="w-full h-auto object-contain mx-auto block rounded-xs shadow-xs"
             style={{
               width: '100%',

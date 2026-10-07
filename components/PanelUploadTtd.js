@@ -71,6 +71,7 @@ async function processPackageSignatureFile(file) {
 
 export default function PanelUploadTtd({
   ttdRecords = [], // Array dari /api/ttd
+  printFormat = 'rekap_dispensasi', // 'rekap_dispensasi' | 'soft_skill'
   userRole = 'admin_cabang',
   branchName = '',
   branchId = '',
@@ -88,10 +89,21 @@ export default function PanelUploadTtd({
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Ambil record paket_ttd
+  const isSoftSkill = printFormat === 'soft_skill';
+  const activePeran = isSoftSkill ? 'paket_ttd_softskill' : 'paket_ttd_rekap';
+
+  // Ambil record paket sesuai format yang SEDANG DIPILIH saja
   const paketRecord = React.useMemo(() => {
-    return (ttdRecords || []).find((rec) => rec.peran === 'paket_ttd') || null;
-  }, [ttdRecords]);
+    if (isSoftSkill) {
+      return (ttdRecords || []).find((rec) => rec.peran === 'paket_ttd_softskill') || null;
+    }
+    // Format Rekap: utamakan paket_ttd_rekap, fallback ke legacy paket_ttd jika ada
+    return (
+      (ttdRecords || []).find((rec) => rec.peran === 'paket_ttd_rekap') ||
+      (ttdRecords || []).find((rec) => rec.peran === 'paket_ttd') ||
+      null
+    );
+  }, [ttdRecords, isSoftSkill]);
 
   const hasPaketTtd = Boolean(paketRecord?.drive_file_id);
   const isAdmin = userRole === 'admin_cabang' || userRole === 'admin_pusat';
@@ -155,14 +167,15 @@ export default function PanelUploadTtd({
     if (!modalState.processedResult) return;
 
     setModalState((prev) => ({ ...prev, isSaving: true }));
-    const toastId = toast.loading('Mengunggah gambar paket TTD ke Google Drive cabang...');
+    const formatLabel = isSoftSkill ? 'Soft Skill' : 'Rekap';
+    const toastId = toast.loading(`Mengunggah gambar paket TTD ${formatLabel} ke Google Drive cabang...`);
 
     try {
       const res = await fetch('/api/ttd', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          peran: 'paket_ttd',
+          peran: activePeran,
           base64: modalState.processedResult.base64,
           mimeType: modalState.processedResult.mimeType,
           branch_id: branchId || undefined,
@@ -171,10 +184,10 @@ export default function PanelUploadTtd({
 
       const json = await res.json();
       if (!json.ok) {
-        throw new Error(json.error || 'Gagal menyimpan gambar paket tanda tangan');
+        throw new Error(json.error || `Gagal menyimpan gambar paket tanda tangan ${formatLabel}`);
       }
 
-      toast.success('Gambar paket tanda tangan berhasil disimpan ke Google Drive cabang!', {
+      toast.success(`Gambar paket tanda tangan ${formatLabel} berhasil disimpan ke Google Drive cabang!`, {
         id: toastId,
       });
 
@@ -200,20 +213,22 @@ export default function PanelUploadTtd({
       return;
     }
 
+    const formatLabel = isSoftSkill ? 'Berita Acara Soft Skill' : 'Berita Acara Rekap';
     if (
       !confirm(
-        'Apakah Anda yakin ingin menghapus gambar paket tanda tangan ini? File di Google Drive cabang akan dipindahkan ke Sampah.'
+        `Apakah Anda yakin ingin menghapus gambar paket tanda tangan ${formatLabel} ini? File di Google Drive cabang akan dipindahkan ke Sampah.`
       )
     ) {
       return;
     }
 
     setIsDeleting(true);
-    const toastId = toast.loading('Menghapus gambar paket TTD...');
+    const toastId = toast.loading(`Menghapus gambar paket TTD ${formatLabel}...`);
 
     try {
+      const targetPeran = paketRecord?.peran || activePeran;
       const params = new URLSearchParams();
-      params.set('peran', 'paket_ttd');
+      params.set('peran', targetPeran);
       if (branchId) params.set('branch_id', branchId);
 
       const res = await fetch(`/api/ttd?${params.toString()}`, {
@@ -225,8 +240,8 @@ export default function PanelUploadTtd({
         throw new Error(json.error || 'Gagal menghapus gambar paket tanda tangan');
       }
 
-      toast.success('Gambar paket tanda tangan berhasil dihapus dari Google Drive!', { id: toastId });
-      if (onTtdUpdated) onTtdUpdated(null, null, 'paket_ttd');
+      toast.success(`Gambar paket tanda tangan ${formatLabel} berhasil dihapus dari Google Drive!`, { id: toastId });
+      if (onTtdUpdated) onTtdUpdated(null, null, targetPeran);
     } catch (err) {
       console.error('[Delete Paket TTD Error]:', err);
       toast.error(err.message || 'Gagal menghapus gambar paket tanda tangan', { id: toastId });
@@ -255,7 +270,9 @@ export default function PanelUploadTtd({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-gray-900 font-title">
-                Upload Gambar Paket TTD
+                {isSoftSkill
+                  ? 'Upload Gambar Paket TTD - Berita Acara Soft Skill'
+                  : 'Upload Gambar Paket TTD - Berita Acara Rekap'}
               </h2>
               {hasPaketTtd ? (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
@@ -269,7 +286,15 @@ export default function PanelUploadTtd({
               )}
             </div>
             <p className="text-xs text-gray-500">
-              Disimpan ke Google Drive cabang {branchName ? `(${branchName})` : ''} &amp; menggantikan seluruh blok tanda tangan pada versi &quot;Ada TTD (Gbr 3)&quot;.
+              {isSoftSkill ? (
+                <>
+                  Disimpan ke Google Drive cabang {branchName ? `(${branchName})` : ''} &amp; menggantikan seluruh blok tanda tangan pada versi &quot;Sudah Ada TTD (Gbr 7)&quot;.
+                </>
+              ) : (
+                <>
+                  Disimpan ke Google Drive cabang {branchName ? `(${branchName})` : ''} &amp; menggantikan seluruh blok tanda tangan pada versi &quot;Ada TTD (Gbr 3)&quot;.
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -288,20 +313,30 @@ export default function PanelUploadTtd({
         <Info className="w-4 h-4 text-[#0056b3] shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="font-semibold text-blue-900">
-            Upload satu gambar berisi seluruh tabel tanda tangan (Mengetahui, Dibuat oleh, 4 TTD, dan nama jabatan).
+            {isSoftSkill
+              ? 'Upload satu gambar berisi seluruh tabel tanda tangan (Mengetahui 2, Mengetahui 1, Membuat, dan 3 TTD).'
+              : 'Upload satu gambar berisi seluruh tabel tanda tangan (Mengetahui, Dibuat oleh, 4 TTD, dan nama jabatan).'}
           </p>
           <p className="text-blue-800/80 leading-relaxed text-[11px]">
-            Potong gambar tepat di tepi garis tabel. Disarankan format <strong>PNG</strong> dengan lebar minimal <strong>1200 px</strong> (maksimal file 5 MB). Gambar akan tampil dalam ukuran lebar penuh tanpa crop atau distorsi.
+            {isSoftSkill ? (
+              <>
+                Sesuai blok tanda tangan pada <strong>Gambar 7</strong> (Mengetahui 2 Deputy Branch Manager ADM, Mengetahui 1 Human Resource Manager, Membuat Training Center Supervisor). Potong gambar tepat di tepi garis tabel. Disarankan format <strong>PNG</strong> dengan lebar minimal <strong>1200 px</strong> (maksimal file 5 MB). Gambar akan tampil dalam ukuran lebar penuh tanpa crop atau distorsi.
+              </>
+            ) : (
+              <>
+                Sesuai blok tanda tangan pada <strong>Gambar 3</strong> (DBM Operasional, DBM Admin, HRD Manager, TC Supervisor). Potong gambar tepat di tepi garis tabel. Disarankan format <strong>PNG</strong> dengan lebar minimal <strong>1200 px</strong> (maksimal file 5 MB). Gambar akan tampil dalam ukuran lebar penuh tanpa crop atau distorsi.
+              </>
+            )}
           </p>
         </div>
       </div>
 
-      {/* Peringatan jika belum ada gambar paket */}
+      {/* Peringatan jika belum ada gambar paket untuk format ini */}
       {!hasPaketTtd && (
         <div className="flex items-center gap-2 text-xs bg-amber-50/70 text-amber-800 p-2.5 rounded-xl border border-amber-200">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="font-medium">
-            Gambar paket TTD belum diupload (versi &quot;Ada TTD&quot; akan menampilkan tabel kosong bawaan sampai paket diupload).
+            Gambar paket TTD untuk format ini belum diupload.
           </span>
         </div>
       )}
@@ -310,7 +345,7 @@ export default function PanelUploadTtd({
       <div className="border rounded-2xl p-4 bg-gray-50/40 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-xs text-gray-800">
-            Pratinjau Blok Tanda Tangan:
+            Pratinjau Blok Tanda Tangan ({isSoftSkill ? 'Soft Skill' : 'Rekap'}):
           </h3>
           <div className="flex items-center gap-2">
             {!hasPaketTtd ? (
@@ -367,7 +402,7 @@ export default function PanelUploadTtd({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={paketRecord.dataUrl}
-              alt="Paket Tanda Tangan Cabang"
+              alt={`Paket Tanda Tangan ${isSoftSkill ? 'Soft Skill' : 'Rekap'}`}
               className="max-h-[280px] max-w-full object-contain mx-auto shadow-xs border border-gray-100 rounded"
             />
           ) : hasPaketTtd ? (
@@ -375,14 +410,14 @@ export default function PanelUploadTtd({
               <FileCheck2 className="w-8 h-8 mx-auto mb-1.5 text-emerald-600" />
               <span className="text-xs font-bold block">Tersimpan di Google Drive</span>
               <span className="text-[10px] text-gray-500 truncate block max-w-xs mx-auto">
-                {paketRecord?.file_name || 'TTD_PAKET.png'}
+                {paketRecord?.file_name || (isSoftSkill ? 'TTD_PAKET_SOFTSKILL.png' : 'TTD_PAKET_REKAP.png')}
               </span>
             </div>
           ) : (
             <div className="text-center p-6 text-gray-400 space-y-1.5">
               <ImageIcon className="w-8 h-8 mx-auto text-gray-300" />
               <p className="text-xs font-medium text-gray-500">
-                Belum ada gambar paket tanda tangan yang diupload
+                Belum ada gambar paket tanda tangan yang diupload untuk format {isSoftSkill ? 'Soft Skill' : 'Rekap'}
               </p>
               <p className="text-[11px] text-gray-400">
                 Klik tombol &quot;Upload Paket TTD&quot; di atas untuk memilih berkas gambar.
@@ -400,7 +435,7 @@ export default function PanelUploadTtd({
             <div className="flex items-center justify-between border-b pb-3 shrink-0">
               <div>
                 <h3 className="font-bold text-sm text-gray-900 font-title">
-                  Pratinjau Gambar Paket Tanda Tangan
+                  Pratinjau Gambar Paket Tanda Tangan - {isSoftSkill ? 'Berita Acara Soft Skill' : 'Berita Acara Rekap'}
                 </h3>
                 <p className="text-xs text-gray-500">
                   Periksa kejelasan seluruh tabel tanda tangan sebelum disimpan ke Google Drive cabang

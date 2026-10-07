@@ -161,13 +161,13 @@ export default function BeritaAcaraSoftSkill({
         Demikian berita acara ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.
       </p>
 
-      {/* 6. Kotak Tanda Tangan: Paket TTD Tunggal (Ada TTD) atau Tabel Bawaan Kosong (TTD Kosong) */}
-      {ttdMode === 'ada' && ttdImages?.paket_ttd ? (
+      {/* 6. Kotak Tanda Tangan: Paket TTD Tunggal Soft Skill (Sudah Ada TTD) atau Tabel Bawaan Kosong (TTD Kosong) */}
+      {ttdMode === 'ada' && ttdImages?.paket_ttd_softskill ? (
         <div className="w-full print-break-avoid pt-2" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={ttdImages.paket_ttd}
-            alt="Blok Paket Tanda Tangan Cabang"
+            src={ttdImages.paket_ttd_softskill}
+            alt="Blok Paket Tanda Tangan Berita Acara Soft Skill"
             className="w-full h-auto object-contain mx-auto block rounded-xs shadow-xs"
             style={{
               width: '100%',

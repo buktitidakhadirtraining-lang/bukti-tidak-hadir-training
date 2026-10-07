@@ -325,6 +325,16 @@ create table if not exists ttd_cabang (
 
 alter table ttd_cabang drop constraint if exists ttd_cabang_peran_check;
 alter table ttd_cabang drop constraint if exists ttd_cabang_updated_by_fkey;
+
+-- Migrasi data lama dari 'paket_ttd' ke 'paket_ttd_rekap'
+update ttd_cabang
+set peran = 'paket_ttd_rekap'
+where peran = 'paket_ttd'
+  and not exists (
+    select 1 from ttd_cabang t2
+    where t2.cabang = ttd_cabang.cabang
+      and t2.peran = 'paket_ttd_rekap'
+  );
 create index if not exists idx_ttd_cabang_lookup on ttd_cabang (cabang, peran);
 
 alter table cetak_rekap enable row level security;
