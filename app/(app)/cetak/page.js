@@ -27,6 +27,7 @@ import BeritaAcaraRekap from '../../../components/BeritaAcaraRekap.js';
 import BeritaAcaraSoftSkill from '../../../components/BeritaAcaraSoftSkill.js';
 import LampiranListTidakHadir from '../../../components/LampiranListTidakHadir.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
+import PanelUploadTtd from '../../../components/PanelUploadTtd.js';
 
 // Komponen gambar bukti yang tajam dan aman
 function ProofImage({ recordId, src, alt, onLoaded, cols = 3 }) {
@@ -105,6 +106,39 @@ export default function CetakPage() {
   // Tracking loaded images for Format Horizontal
   const [loadedImageIds, setLoadedImageIds] = useState(new Set());
   const [horizontalCols, setHorizontalCols] = useState(3); // 3 (default - foto lebih besar) | 4 kolom
+
+  // Data Tanda Tangan Cabang (dari Google Drive & Supabase)
+  const [ttdRecords, setTtdRecords] = useState([]);
+  const [ttdImages, setTtdImages] = useState({});
+  const [isTtdLoading, setIsTtdLoading] = useState(false);
+
+  const fetchTtdRecords = useCallback(async () => {
+    try {
+      setIsTtdLoading(true);
+      const params = new URLSearchParams();
+      if (branchId) params.set('branch_id', branchId);
+      const res = await fetch(`/api/ttd?${params.toString()}`);
+      const json = await res.json();
+      if (json.ok && Array.isArray(json.data)) {
+        setTtdRecords(json.data);
+        const imgMap = {};
+        for (const item of json.data) {
+          if (item.peran && item.dataUrl) {
+            imgMap[item.peran] = item.dataUrl;
+          }
+        }
+        setTtdImages(imgMap);
+      }
+    } catch (e) {
+      console.error('[fetchTtdRecords error]:', e);
+    } finally {
+      setIsTtdLoading(false);
+    }
+  }, [branchId]);
+
+  useEffect(() => {
+    fetchTtdRecords();
+  }, [fetchTtdRecords]);
 
   // 1. Muat Meta
   useEffect(() => {
@@ -538,7 +572,7 @@ export default function CetakPage() {
             fontStyle: 'bold',
             halign: 'center',
             valign: 'bottom',
-            minCellHeight: 20,
+            minCellHeight: 26,
             lineWidth: 0.2,
             lineColor: [0, 0, 0],
             cellPadding: 2,
@@ -554,6 +588,24 @@ export default function CetakPage() {
             1: { cellWidth: 46.5 },
             2: { cellWidth: 46.5 },
             3: { cellWidth: 46.5 },
+          },
+          didDrawCell: function (data) {
+            if (ttdMode === 'ada' && data.section === 'body' && data.row.index === 0) {
+              const roles = ['dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor'];
+              const roleKey = roles[data.column.index];
+              const imgData = ttdImages && ttdImages[roleKey];
+              if (imgData) {
+                try {
+                  const imgW = 30;
+                  const imgH = 15;
+                  const x = data.cell.x + (data.cell.width - imgW) / 2;
+                  const y = data.cell.y + 2;
+                  doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
+                } catch (imgErr) {
+                  console.warn('Gagal menambahkan TTD ke PDF:', imgErr);
+                }
+              }
+            }
           },
         });
 
@@ -1355,6 +1407,20 @@ export default function CetakPage() {
         )}
       </div>
 
+      {/* Panel Upload Tanda Tangan Cabang (Hanya saat Berita Acara Rekap dipilih) */}
+      {printFormat === 'rekap_dispensasi' && (
+        <div className="no-print">
+          <PanelUploadTtd
+            ttdRecords={ttdRecords}
+            userRole={meta?.userRole || 'admin_cabang'}
+            branchName={selectedBranchObj?.name || meta?.userBranchName || ''}
+            branchId={branchId}
+            isDriveReady={Boolean(selectedBranchObj?.driveReady ?? meta?.userBranchDriveReady ?? true)}
+            onTtdUpdated={fetchTtdRecords}
+          />
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* 1. FORMAT: BERITA ACARA REKAPITULASI (GAMBAR 2 & GAMBAR 3)                 */}
       {/* ========================================================================= */}
@@ -1368,6 +1434,7 @@ export default function CetakPage() {
             cabang={cabangCetak}
             bulan={bulanCetak}
             tahun={tahunCetak}
+            ttdImages={ttdImages}
           />
         </div>
       )}

@@ -116,11 +116,45 @@ CREATE POLICY "Delete list_soft_skill per cabang" ON public.list_soft_skill
     FOR DELETE USING (true);
 
 
--- 3. Berikan Izin Akses Tabel
+-- 3. TABEL: ttd_cabang (Menyimpan Tanda Tangan Resmi per Cabang & Peran)
+CREATE TABLE IF NOT EXISTS public.ttd_cabang (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cabang TEXT NOT NULL,
+    peran TEXT NOT NULL CHECK (peran IN ('dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor')),
+    drive_file_id TEXT NOT NULL,
+    file_name TEXT,
+    mime_type TEXT DEFAULT 'image/png',
+    updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (cabang, peran)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ttd_cabang_lookup ON public.ttd_cabang (cabang, peran);
+ALTER TABLE public.ttd_cabang ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Select ttd_cabang per cabang" ON public.ttd_cabang;
+DROP POLICY IF EXISTS "Insert ttd_cabang per cabang" ON public.ttd_cabang;
+DROP POLICY IF EXISTS "Update ttd_cabang per cabang" ON public.ttd_cabang;
+DROP POLICY IF EXISTS "Delete ttd_cabang per cabang" ON public.ttd_cabang;
+
+CREATE POLICY "Select ttd_cabang per cabang" ON public.ttd_cabang
+    FOR SELECT USING (true);
+
+CREATE POLICY "Insert ttd_cabang per cabang" ON public.ttd_cabang
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Update ttd_cabang per cabang" ON public.ttd_cabang
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Delete ttd_cabang per cabang" ON public.ttd_cabang
+    FOR DELETE USING (true);
+
+
+-- 4. Berikan Izin Akses Tabel
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
--- 4. Reload Schema PostgREST
+-- 5. Reload Schema PostgREST
 NOTIFY pgrst, 'reload schema';`;
 
 export default function SqlEditorModal({ isOpen, onClose }) {

@@ -311,10 +311,26 @@ create table if not exists cetak_list_tidak_hadir (
   updated_at timestamptz default now() not null
 );
 
+create table if not exists ttd_cabang (
+  id uuid primary key default gen_random_uuid(),
+  cabang text not null,
+  peran text not null check (peran in ('dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor')),
+  drive_file_id text not null,
+  file_name text,
+  mime_type text default 'image/png',
+  updated_by uuid references users(id) on delete set null,
+  updated_at timestamptz default now() not null,
+  unique (cabang, peran)
+);
+create index if not exists idx_ttd_cabang_lookup on ttd_cabang (cabang, peran);
+
 alter table cetak_rekap enable row level security;
 alter table list_tidak_hadir enable row level security;
 alter table data_tambahan enable row level security;
 alter table cetak_list_tidak_hadir enable row level security;
+alter table ttd_cabang enable row level security;
+
+create policy "Allow all on ttd_cabang" on ttd_cabang for all using (true) with check (true);
 
 -- ==============================================================================
 -- 16. RELOAD SCHEMA CACHE POSTGREST
