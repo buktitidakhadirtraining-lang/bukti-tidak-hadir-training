@@ -22,12 +22,14 @@ import {
   Save,
   RotateCcw,
   UserCheck,
+  ImageIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { LOGO_URL, formatDateIndo } from '../../../lib/config.js';
 import BeritaAcaraRekap from '../../../components/BeritaAcaraRekap.js';
 import BeritaAcaraSoftSkill from '../../../components/BeritaAcaraSoftSkill.js';
+import LampiranBuktiSoftSkill from '../../../components/LampiranBuktiSoftSkill.js';
 import LampiranListTidakHadir from '../../../components/LampiranListTidakHadir.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 import PanelUploadTtd from '../../../components/PanelUploadTtd.js';
@@ -89,6 +91,8 @@ export default function CetakPage() {
   const [softSkillCabang, setSoftSkillCabang] = useState('Surabaya');
   const [softSkillPeriode, setSoftSkillPeriode] = useState('September 2026');
   const [softSkillTanggalDibuat, setSoftSkillTanggalDibuat] = useState('30 September 2026');
+  const [softSkillCategory, setSoftSkillCategory] = useState('pimpinan_shift'); // 'pimpinan_shift' | 'chief_of_store'
+  const [includeSoftSkillPhotos, setIncludeSoftSkillPhotos] = useState(true); // Lampiran Foto Peserta
 
   // Pengaturan Lampiran List Tidak Hadir (Gambar 4 & 5)
   const [selectedTrainingListFilter, setSelectedTrainingListFilter] = useState('');
@@ -380,6 +384,44 @@ export default function CetakPage() {
   function handlePrint() {
     window.print();
   }
+
+  // Helper & Pengelompokan Kategori Jabatan Berita Acara Soft Skill (Gambar 6 & 7)
+  const isChiefOfStore = useCallback((jabatan) => {
+    if (!jabatan) return false;
+    const norm = String(jabatan).toLowerCase().replace(/\s+/g, ' ').trim();
+    return norm.includes('chief of store');
+  }, []);
+
+  const softSkillCounts = useMemo(() => {
+    let ps = 0;
+    let cos = 0;
+    (softSkillData || []).forEach((row) => {
+      if (isChiefOfStore(row.jabatan)) {
+        cos++;
+      } else {
+        ps++;
+      }
+    });
+    return { pimpinanShift: ps, chiefOfStore: cos };
+  }, [softSkillData, isChiefOfStore]);
+
+  const filteredSoftSkillData = useMemo(() => {
+    if (!softSkillData || softSkillData.length === 0) return [];
+    const isCosFilter = softSkillCategory === 'chief_of_store';
+    const filtered = softSkillData.filter((row) => {
+      const isCos = isChiefOfStore(row.jabatan);
+      return isCosFilter ? isCos : !isCos;
+    });
+
+    // Re-index nomor urut 1..N
+    return filtered.map((row, idx) => ({
+      ...row,
+      no: idx + 1,
+    }));
+  }, [softSkillData, softSkillCategory, isChiefOfStore]);
+
+  const softSkillKategoriLabel =
+    softSkillCategory === 'chief_of_store' ? 'Chief of Store' : 'Pimpinan Shift';
 
   // Fungsi mengunduh berkas fisik PDF berbasis Teks & Vector (jsPDF + jspdf-autotable)
   async function handleDownloadPdf() {
@@ -764,7 +806,7 @@ export default function CetakPage() {
       }
 
       // =========================================================================
-      // 3. FORMAT: BERITA ACARA SOFT SKILL
+      // 3. FORMAT: BERITA ACARA SOFT SKILL (GAMBAR 6 & GAMBAR 7) + LAMPIRAN FOTO
       // =========================================================================
       if (printFormat === 'soft_skill') {
         const doc = new jsPDF({
@@ -773,18 +815,26 @@ export default function CetakPage() {
           orientation: 'portrait',
         });
 
-        const filename = `Berita_Acara_Soft_Skill_${softSkillPeriode.replace(/[^a-zA-Z0-9]/g, '_')}_${softSkillTtdMode}.pdf`;
+        const katJudul = softSkillKategoriLabel.toUpperCase();
+        const katFileTag = softSkillCategory === 'chief_of_store' ? 'Chief_of_Store' : 'Pimpinan_Shift';
+        const filename = `Berita_Acara_Soft_Skill_${katFileTag}_${softSkillPeriode.replace(/[^a-zA-Z0-9]/g, '_')}_${softSkillTtdMode}.pdf`;
 
+        const totalDocPages =
+          includeSoftSkillPhotos && filteredSoftSkillData.length > 0
+            ? 1 + Math.ceil(filteredSoftSkillData.length / 3)
+            : 1;
+
+        // --- HALAMAN 1: BERITA ACARA UTAMA ---
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
         doc.setTextColor(0, 0, 0);
         doc.text('BERITA ACARA', 105, 18, { align: 'center' });
         doc.setFontSize(12);
-        doc.text('PESERTA GAGAL MENGIKUTI TRAINING SOFT SKILL DASAR PIMPINAN SHIFT', 105, 24, { align: 'center' });
+        doc.text(`PESERTA GAGAL MENGIKUTI TRAINING SOFT SKILL DASAR ${katJudul}`, 105, 24, { align: 'center' });
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
-        const pText = `Pada hari ini, ${softSkillTanggalDibuat}, kami yang bertanda tangan di bawah ini menyatakan bahwa peserta berikut dari Cabang ${softSkillCabang} tidak dapat mengikuti Training Soft Skill Dasar Pimpinan Shift pada periode ${softSkillPeriode} dengan alasan sebagaimana tercantum di bawah ini.`;
+        const pText = `Pada hari ini, ${softSkillTanggalDibuat}, kami yang bertanda tangan di bawah ini menyatakan bahwa peserta berikut dari Cabang ${softSkillCabang} tidak dapat mengikuti Training Soft Skill Dasar ${softSkillKategoriLabel} pada periode ${softSkillPeriode} dengan alasan sebagaimana tercantum di bawah ini.`;
         const splitP = doc.splitTextToSize(pText, 186);
         doc.text(splitP, 12, 33);
 
@@ -796,19 +846,25 @@ export default function CetakPage() {
         doc.text(`Periode Training : ${softSkillPeriode}`, 12, currentY);
         currentY += 4.5;
         doc.text(`Tanggal Dibuat : ${softSkillTanggalDibuat}`, 12, currentY);
+        currentY += 4.5;
+        doc.text(`Kategori Peserta : ${softSkillKategoriLabel} (${filteredSoftSkillData.length} Peserta)`, 12, currentY);
         currentY += 6;
 
         doc.text('Daftar Peserta Gagal Training:', 12, currentY);
         currentY += 4;
 
-        const tableRows = (softSkillData || []).map((row, idx) => [
+        const tableRows = (filteredSoftSkillData || []).map((row, idx) => [
           String(row.no || idx + 1),
           String(row.nik || ''),
           String(row.nama || '').toUpperCase(),
           String(row.jabatan || ''),
           String(row.kategory || row.kategori || '-'),
-          String(row.detail_alasan || '-'),
+          String(row.detail_alasan || row.alasan || '-'),
         ]);
+
+        if (tableRows.length === 0) {
+          tableRows.push(['-', '-', `Tidak ada data peserta untuk kategori ${softSkillKategoriLabel}`, '-', '-', '-']);
+        }
 
         autoTable(doc, {
           startY: currentY,
@@ -1000,6 +1056,144 @@ export default function CetakPage() {
               }
             },
           });
+        }
+
+        // Footer Halaman 1 jika multi halaman
+        if (totalDocPages > 1) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(`Berita Acara Soft Skill • Kategori: ${softSkillKategoriLabel} • Cabang: ${softSkillCabang}`, 12, 287);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0);
+          doc.text(`Halaman 1 dari ${totalDocPages}`, 198, 287, { align: 'right' });
+        }
+
+        // --- HALAMAN-HALAMAN LAMPIRAN FOTO BUKTI (JIKA AKTIF) ---
+        if (includeSoftSkillPhotos && filteredSoftSkillData.length > 0) {
+          const photoChunks = [];
+          for (let i = 0; i < filteredSoftSkillData.length; i += 3) {
+            photoChunks.push(filteredSoftSkillData.slice(i, i + 3));
+          }
+
+          // Peta bukti foto per NIK peserta dari records
+          const matchedPhotosMap = new Map();
+          for (const p of filteredSoftSkillData) {
+            const cleanNik = String(p.nik || '').trim();
+            const matched = (records || []).filter(
+              (r) =>
+                String(r.nik || '').trim() === cleanNik &&
+                r.drive_file_id &&
+                (!r.file_mime_type || r.file_mime_type.startsWith('image/'))
+            );
+            matchedPhotosMap.set(cleanNik, matched);
+          }
+
+          for (let pIdx = 0; pIdx < photoChunks.length; pIdx++) {
+            const pageNum = 2 + pIdx;
+            doc.addPage('a4', 'portrait');
+
+            // Header Lampiran
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(13);
+            doc.setTextColor(30, 96, 213); // #1E60D5
+            doc.text('LAMPIRAN BUKTI FOTO PESERTA - BERITA ACARA SOFT SKILL', 105, 18, { align: 'center' });
+
+            doc.setFontSize(9.5);
+            doc.setTextColor(40, 40, 40);
+            doc.text(`KATEGORI: ${katJudul} • CABANG: ${softSkillCabang.toUpperCase()}`, 105, 24, { align: 'center' });
+
+            const currentChunk = photoChunks[pIdx];
+            let cardY = 30;
+            const cardHeight = 76;
+            const cardSpacing = 5;
+
+            for (const item of currentChunk) {
+              // Outer border kartu
+              doc.setDrawColor(210, 215, 220);
+              doc.setLineWidth(0.3);
+              doc.setFillColor(255, 255, 255);
+              doc.roundedRect(12, cardY, 186, cardHeight, 1, 1, 'FD');
+
+              // Judul Kartu: No. NIK: <nik> - <NAMA>
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(9);
+              doc.setTextColor(0, 0, 0);
+              const headerText = `${item.no}. NIK: ${item.nik} - ${String(item.nama || '').toUpperCase()}`;
+              doc.text(headerText, 15, cardY + 6);
+
+              // Subteks Kategori & Alasan
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(7.5);
+              doc.setTextColor(70, 70, 70);
+              const metaText = `Kategori: ${item.kategory || item.kategori || '-'} | Alasan: ${item.detail_alasan || item.alasan || '-'} | Kelengkapan Wajib:`;
+              doc.text(metaText, 15, cardY + 11);
+
+              // Kotak area foto (Border Hitam tipis)
+              const photoBoxX = 15;
+              const photoBoxY = cardY + 14;
+              const photoBoxW = 180;
+              const photoBoxH = 57;
+
+              doc.setDrawColor(0, 0, 0);
+              doc.setLineWidth(0.2);
+              doc.setFillColor(248, 249, 250);
+              doc.rect(photoBoxX, photoBoxY, photoBoxW, photoBoxH, 'FD');
+
+              const cleanNik = String(item.nik || '').trim();
+              const pPhotos = matchedPhotosMap.get(cleanNik) || [];
+
+              if (pPhotos.length > 0) {
+                const firstPhoto = pPhotos[0];
+                try {
+                  const imgUrl = `/api/records/${firstPhoto.id}/file`;
+                  const imgRes = await fetch(imgUrl);
+                  if (imgRes.ok) {
+                    const blob = await imgRes.blob();
+                    const reader = new Promise((resolve) => {
+                      const fr = new FileReader();
+                      fr.onload = () => resolve(fr.result);
+                      fr.onerror = () => resolve(null);
+                      fr.readAsDataURL(blob);
+                    });
+                    const base64Data = await reader;
+                    if (base64Data) {
+                      const imgProps = doc.getImageProperties(base64Data);
+                      let drawW = photoBoxW - 4;
+                      let drawH = (imgProps.height * drawW) / imgProps.width;
+                      if (drawH > photoBoxH - 4) {
+                        const scale = (photoBoxH - 4) / drawH;
+                        drawH = photoBoxH - 4;
+                        drawW = drawW * scale;
+                      }
+                      const drawX = photoBoxX + (photoBoxW - drawW) / 2;
+                      const drawY = photoBoxY + (photoBoxH - drawH) / 2;
+                      doc.addImage(base64Data, 'JPEG', drawX, drawY, drawW, drawH);
+                    }
+                  }
+                } catch (imgErr) {
+                  console.warn('Gagal memuat foto bukti ke PDF:', imgErr);
+                }
+              } else {
+                // Placeholder teks
+                doc.setFont('helvetica', 'italic');
+                doc.setFontSize(8);
+                doc.setTextColor(150, 150, 150);
+                doc.text('(Belum ada bukti foto)', photoBoxX + photoBoxW / 2, photoBoxY + photoBoxH / 2 + 1, { align: 'center' });
+              }
+
+              cardY += cardHeight + cardSpacing;
+            }
+
+            // Footer Lampiran
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Lampiran Bukti Kelengkapan • Kategori: ${softSkillKategoriLabel} • Cabang: ${softSkillCabang}`, 12, 287);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Halaman ${pageNum} dari ${totalDocPages}`, 198, 287, { align: 'right' });
+          }
         }
 
         doc.save(filename);
@@ -1424,8 +1618,42 @@ export default function CetakPage() {
         {/* B. Pengaturan Khusus Berita Acara Soft Skill (Gambar 6 & 7) */}
         {printFormat === 'soft_skill' && (
           <div className="pt-3 border-t border-gray-100 space-y-3">
-            {/* Baris 1: Kontrol Umum (Versi TTD, Warna Tinta, Cabang, Periode, Tanggal Dibuat) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs bg-indigo-50/40 p-3.5 rounded-xl border border-indigo-100">
+            {/* Baris 1: Kontrol Umum (Kategori Peserta, Versi TTD, Warna Tinta, Cabang, Periode, Tanggal Dibuat, Opsi Foto) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs bg-indigo-50/40 p-3.5 rounded-xl border border-indigo-100">
+              {/* Pilihan Kategori Peserta */}
+              <div>
+                <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
+                  <Users2 className="w-3.5 h-3.5 text-[#0056b3]" />
+                  Kategori Peserta
+                </label>
+                <div className="inline-flex w-full p-1 bg-white rounded-lg border border-gray-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setSoftSkillCategory('pimpinan_shift')}
+                    className={`flex-1 py-1 px-1.5 text-center font-bold rounded text-xs transition-colors truncate ${
+                      softSkillCategory === 'pimpinan_shift'
+                        ? 'bg-[#0056b3] text-white shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                    title="Pimpinan Shift"
+                  >
+                    Pimpinan Shift ({softSkillCounts.pimpinanShift})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSoftSkillCategory('chief_of_store')}
+                    className={`flex-1 py-1 px-1.5 text-center font-bold rounded text-xs transition-colors truncate ${
+                      softSkillCategory === 'chief_of_store'
+                        ? 'bg-[#0056b3] text-white shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                    title="Chief of Store"
+                  >
+                    Chief of Store ({softSkillCounts.chiefOfStore})
+                  </button>
+                </div>
+              </div>
+
               {/* Pilihan Mode Tanda Tangan */}
               <div>
                 <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
@@ -1495,7 +1723,7 @@ export default function CetakPage() {
                 />
               </div>
 
-              {/* Tanggal Dibuat */}
+              {/* Tanggal Dibuat & Toggle Foto */}
               <div>
                 <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-[#0056b3]" />
@@ -1508,6 +1736,31 @@ export default function CetakPage() {
                   placeholder="30 September 2026"
                   className="w-full bg-white border border-gray-200 rounded-lg p-2 font-medium"
                 />
+              </div>
+            </div>
+
+            {/* Opsi Lampiran Bukti Foto Peserta */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-blue-50/70 rounded-xl border border-blue-200 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeSoftSkillPhotos}
+                  onChange={(e) => setIncludeSoftSkillPhotos(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#0056b3] focus:ring-[#0056b3] accent-[#0056b3]"
+                />
+                <span className="font-bold text-gray-800 flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-[#0056b3]" />
+                  Sertakan Halaman Lampiran Bukti Foto Peserta (Format Gambar 7 Lanjutan)
+                </span>
+              </label>
+              <div className="text-gray-600 text-[11px]">
+                {includeSoftSkillPhotos ? (
+                  <span className="text-[#0056b3] font-semibold">
+                    ✓ Aktif: Foto bukti dari {filteredSoftSkillData.length} peserta akan dicetak di halaman lanjutan (3 peserta/lembar A4).
+                  </span>
+                ) : (
+                  <span>Hanya cetak lembar Berita Acara (1 Halaman).</span>
+                )}
               </div>
             </div>
 
@@ -1993,21 +2246,40 @@ export default function CetakPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 2. FORMAT: BERITA ACARA SOFT SKILL (GAMBAR 6 & GAMBAR 7)                   */}
+      {/* 2. FORMAT: BERITA ACARA SOFT SKILL (GAMBAR 6 & GAMBAR 7) + LAMPIRAN FOTO   */}
       {/* ========================================================================= */}
       {printFormat === 'soft_skill' && (
         <ErrorBoundary componentName="Berita Acara Soft Skill">
-          <div id="printable-content" className="max-w-4xl mx-auto">
+          <div id="printable-content" className="max-w-4xl mx-auto space-y-8 print:space-y-0">
             <BeritaAcaraSoftSkill
-              data={softSkillData}
+              data={filteredSoftSkillData}
               ttdMode={softSkillTtdMode}
               inkColor={inkColor}
               cabang={softSkillCabang}
               periode={softSkillPeriode}
               tanggalDibuat={softSkillTanggalDibuat}
+              kategoriLabel={softSkillKategoriLabel}
               ttdImages={ttdImages}
               signerConfig={softSkillSignerConfig}
+              pageNumber={1}
+              totalDocPages={
+                includeSoftSkillPhotos && filteredSoftSkillData.length > 0
+                  ? 1 + Math.ceil(filteredSoftSkillData.length / 3)
+                  : 1
+              }
             />
+
+            {/* Lampiran Halaman Bukti Foto Peserta (Format Gambar 7 Lanjutan) */}
+            {includeSoftSkillPhotos && filteredSoftSkillData.length > 0 && (
+              <LampiranBuktiSoftSkill
+                data={filteredSoftSkillData}
+                records={records}
+                cabang={softSkillCabang}
+                kategoriLabel={softSkillKategoriLabel}
+                startPageNumber={2}
+                totalDocPages={1 + Math.ceil(filteredSoftSkillData.length / 3)}
+              />
+            )}
           </div>
         </ErrorBoundary>
       )}
