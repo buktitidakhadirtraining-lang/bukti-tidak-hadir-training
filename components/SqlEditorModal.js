@@ -6,104 +6,104 @@ import { Copy, Check, X, Database, Sparkles, AlertCircle, ShieldAlert } from 'lu
 import { toast } from 'sonner';
 
 const SQL_MIGRATION_ADD_BRANCH_ID = `-- ==============================================================================
--- SKRIP MIGRASI & PERBAIKAN HAK AKSES SUPABASE (JALANKAN DI SQL EDITOR)
+-- SKRIP TABEL & ROW LEVEL SECURITY (RLS) SUPABASE - cetak_rekap & list_soft_skill
+-- JALANKAN SKRIP INI DI SUPABASE SQL EDITOR (https://supabase.com/dashboard)
 -- ==============================================================================
--- 1. Buat tabel jika belum ada
-create table if not exists data_tambahan (
-  id uuid primary key default gen_random_uuid(),
-  no int,
-  training text not null,
-  nik text not null,
-  nama text not null,
-  kd_toko text,
-  nama_toko text,
-  alasan_tidak_hadir text,
-  branch_id text,
-  created_by text,
-  created_at timestamptz default now() not null,
-  updated_at timestamptz default now() not null
+
+-- 1. TABEL: cetak_rekap
+CREATE TABLE IF NOT EXISTS public.cetak_rekap (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cabang TEXT NOT NULL,
+    branch_id TEXT,
+    no INTEGER,
+    jenis_training TEXT,
+    target_lskt INTEGER DEFAULT 0,
+    dispensasi INTEGER DEFAULT 0,
+    target_tc_report INTEGER DEFAULT 0,
+    hadir INTEGER DEFAULT 0,
+    tidak_hadir INTEGER DEFAULT 0,
+    no_list_peserta_tidak_hadir TEXT,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists list_tidak_hadir (
-  id uuid primary key default gen_random_uuid(),
-  no int,
-  training text not null,
-  nik text not null,
-  nama text not null,
-  kd_toko text,
-  nama_toko text,
-  alasan_tidak_hadir text,
-  branch_id text,
-  created_by text,
-  created_at timestamptz default now() not null,
-  updated_at timestamptz default now() not null
+-- Pastikan kolom cabang ada
+ALTER TABLE public.cetak_rekap ADD COLUMN IF NOT EXISTS cabang TEXT;
+ALTER TABLE public.cetak_rekap ADD COLUMN IF NOT EXISTS branch_id TEXT;
+
+-- Aktifkan RLS pada cetak_rekap
+ALTER TABLE public.cetak_rekap ENABLE ROW LEVEL SECURITY;
+
+-- Drop Policy Lama
+DROP POLICY IF EXISTS "Select cetak_rekap per cabang" ON public.cetak_rekap;
+DROP POLICY IF EXISTS "Insert cetak_rekap per cabang" ON public.cetak_rekap;
+DROP POLICY IF EXISTS "Update cetak_rekap per cabang" ON public.cetak_rekap;
+DROP POLICY IF EXISTS "Delete cetak_rekap per cabang" ON public.cetak_rekap;
+
+-- Policy RLS cetak_rekap
+CREATE POLICY "Select cetak_rekap per cabang" ON public.cetak_rekap
+    FOR SELECT USING (true);
+
+CREATE POLICY "Insert cetak_rekap per cabang" ON public.cetak_rekap
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Update cetak_rekap per cabang" ON public.cetak_rekap
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Delete cetak_rekap per cabang" ON public.cetak_rekap
+    FOR DELETE USING (true);
+
+
+-- 2. TABEL: list_soft_skill
+CREATE TABLE IF NOT EXISTS public.list_soft_skill (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cabang TEXT NOT NULL,
+    branch_id TEXT,
+    no INTEGER,
+    nik TEXT,
+    nama TEXT,
+    jabatan TEXT,
+    kategory TEXT,
+    detail_alasan TEXT,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-create table if not exists cetak_list_tidak_hadir (
-  id text primary key,
-  no int,
-  training text not null,
-  nik text not null,
-  nama text not null,
-  kd_toko text,
-  nama_toko text,
-  alasan_tidak_hadir text,
-  source_type text default 'list_tidak_hadir',
-  branch_id text,
-  created_by text,
-  created_at timestamptz default now() not null,
-  updated_at timestamptz default now() not null
-);
+-- Pastikan kolom cabang ada
+ALTER TABLE public.list_soft_skill ADD COLUMN IF NOT EXISTS cabang TEXT;
+ALTER TABLE public.list_soft_skill ADD COLUMN IF NOT EXISTS branch_id TEXT;
 
-create table if not exists cetak_rekap (
-  id uuid primary key default gen_random_uuid(),
-  no int,
-  jenis_training text not null,
-  target_lskt text default '0',
-  dispensasi text default '0',
-  target_tc_report text default '',
-  hadir text default '',
-  tidak_hadir text default '',
-  no_list_peserta_tidak_hadir text default '',
-  branch_id text,
-  created_at timestamptz default now() not null,
-  updated_at timestamptz default now() not null
-);
+-- Aktifkan RLS pada list_soft_skill
+ALTER TABLE public.list_soft_skill ENABLE ROW LEVEL SECURITY;
 
--- 2. Pastikan kolom branch_id & created_by ada pada semua tabel
-alter table data_tambahan add column if not exists branch_id text;
-alter table data_tambahan add column if not exists created_by text;
-alter table data_tambahan add column if not exists no int;
-alter table data_tambahan add column if not exists kd_toko text;
-alter table data_tambahan add column if not exists nama_toko text;
-alter table data_tambahan add column if not exists alasan_tidak_hadir text;
+-- Drop Policy Lama
+DROP POLICY IF EXISTS "Select list_soft_skill per cabang" ON public.list_soft_skill;
+DROP POLICY IF EXISTS "Insert list_soft_skill per cabang" ON public.list_soft_skill;
+DROP POLICY IF EXISTS "Update list_soft_skill per cabang" ON public.list_soft_skill;
+DROP POLICY IF EXISTS "Delete list_soft_skill per cabang" ON public.list_soft_skill;
 
-alter table list_tidak_hadir add column if not exists branch_id text;
-alter table list_tidak_hadir add column if not exists created_by text;
-alter table list_tidak_hadir add column if not exists no int;
-alter table list_tidak_hadir add column if not exists kd_toko text;
-alter table list_tidak_hadir add column if not exists nama_toko text;
-alter table list_tidak_hadir add column if not exists alasan_tidak_hadir text;
+-- Policy RLS list_soft_skill
+CREATE POLICY "Select list_soft_skill per cabang" ON public.list_soft_skill
+    FOR SELECT USING (true);
 
-alter table cetak_list_tidak_hadir add column if not exists branch_id text;
-alter table cetak_list_tidak_hadir add column if not exists created_by text;
-alter table cetak_list_tidak_hadir add column if not exists source_type text default 'list_tidak_hadir';
+CREATE POLICY "Insert list_soft_skill per cabang" ON public.list_soft_skill
+    FOR INSERT WITH CHECK (true);
 
-alter table cetak_rekap add column if not exists branch_id text;
+CREATE POLICY "Update list_soft_skill per cabang" ON public.list_soft_skill
+    FOR UPDATE USING (true);
 
--- 3. Matikan RLS agar Anon Key & Service Role bisa menyimpan data tanpa diblokir
-alter table if exists data_tambahan disable row level security;
-alter table if exists list_tidak_hadir disable row level security;
-alter table if exists cetak_list_tidak_hadir disable row level security;
-alter table if exists cetak_rekap disable row level security;
-alter table if exists list_soft_skill disable row level security;
+CREATE POLICY "Delete list_soft_skill per cabang" ON public.list_soft_skill
+    FOR DELETE USING (true);
 
--- 4. Berikan izin penuh ke anon, authenticated, dan service_role
-grant all on all tables in schema public to anon, authenticated, service_role;
-grant all on all sequences in schema public to anon, authenticated, service_role;
 
--- 5. Reload Schema PostgREST
-notify pgrst, 'reload schema';`;
+-- 3. Berikan Izin Akses Tabel
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
+-- 4. Reload Schema PostgREST
+NOTIFY pgrst, 'reload schema';`;
 
 export default function SqlEditorModal({ isOpen, onClose }) {
   const [copied, setCopied] = useState(false);

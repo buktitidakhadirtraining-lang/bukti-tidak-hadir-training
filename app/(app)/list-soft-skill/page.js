@@ -1,58 +1,54 @@
 // app/(app)/list-soft-skill/page.js
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  FileText,
-  Loader2,
-  RefreshCw,
-  Search,
-  TableProperties,
-  Edit2,
-  Trash2,
-  Trash,
-  UploadCloud,
-  Download,
-  Building2,
-  X,
-  Save,
-  CheckCircle2,
-} from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import ImportExportModal from '../../../components/ImportExportModal.js';
+import {
+  Search,
+  Download,
+  Printer,
+  FileSpreadsheet,
+  ChevronLeft,
+  ChevronRight,
+  UploadCloud,
+  FileDown,
+  Trash2,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Loader2,
+  Eye,
+  GraduationCap,
+} from 'lucide-react';
 import ConfirmDialog from '../../../components/ConfirmDialog.js';
 
 export default function ListSoftSkillPage() {
-  const [loadingList, setLoadingList] = useState(false);
-  const [records, setRecords] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [meta, setMeta] = useState(null);
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Modals
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [editingRecord, setEditingRecord] = useState(null);
-  const [deleteSingleDialog, setDeleteSingleDialog] = useState({
+  // Search & Pagination
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+
+  // Import File Ref & Preview Modal
+  const fileInputRef = useRef(null);
+  const [importing, setSavingImport] = useState(false);
+  const [previewModal, setPreviewModal] = useState({
     isOpen: false,
-    record: null,
-    loading: false,
+    rows: [],
+    totalRows: 0,
   });
+
+  // Delete All Confirm Dialog
   const [deleteAllDialog, setDeleteAllDialog] = useState({
     isOpen: false,
     loading: false,
   });
 
-  // Edit form state
-  const [editForm, setEditForm] = useState({
-    no: '',
-    nik: '',
-    nama: '',
-    jabatan: '-',
-    kategori: '-',
-    detail_alasan: '-',
-  });
-  const [savingEdit, setSavingEdit] = useState(false);
-
-  // Load meta
+  // Load Meta
   useEffect(() => {
     async function loadMeta() {
       try {
@@ -60,27 +56,27 @@ export default function ListSoftSkillPage() {
         const json = await res.json();
         if (json.ok) setMeta(json.data);
       } catch (err) {
-        console.error('Failed to load meta:', err);
+        console.error('Error loading meta:', err);
       }
     }
     loadMeta();
   }, []);
 
-  // Fetch records
+  // Fetch Records
   const fetchRecords = useCallback(async () => {
-    setLoadingList(true);
+    setLoading(true);
     try {
       const res = await fetch('/api/list-soft-skill');
       const json = await res.json();
       if (json.ok) {
         setRecords(json.data || []);
       } else {
-        toast.error(json.error || 'Gagal memuat data soft skill');
+        toast.error(json.error || 'Gagal memuat data list soft skill');
       }
     } catch (err) {
-      console.error('Failed to fetch list soft skill:', err);
+      toast.error('Terjadi kesalahan saat memuat data');
     } finally {
-      setLoadingList(false);
+      setLoading(false);
     }
   }, []);
 
@@ -88,434 +84,426 @@ export default function ListSoftSkillPage() {
     fetchRecords();
   }, [fetchRecords]);
 
-  // Open Edit Modal
-  function openEdit(rec) {
-    setEditingRecord(rec);
-    setEditForm({
-      no: rec.no || '',
-      nik: rec.nik || '',
-      nama: rec.nama || '',
-      jabatan: rec.jabatan || '-',
-      kategori: rec.kategori || rec.kategory || '-',
-      detail_alasan: rec.detail_alasan || '-',
-    });
+  // Handle File Selection for Import (Preview First)
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    e.target.value = '';
+
+    const toastId = toast.loading('Memeriksa dan membaca berkas...');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('preview', 'true');
+
+      const res = await fetch('/api/list-soft-skill/import', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (res.ok && json.ok && json.preview) {
+        toast.dismiss(toastId);
+        setPreviewModal({
+          isOpen: true,
+          rows: json.rows || [],
+          totalRows: json.totalRows || (json.rows || []).length,
+        });
+      } else {
+        toast.error(json.error || 'Gagal membaca berkas impor', { id: toastId, duration: 6000 });
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan: ' + err.message, { id: toastId });
+    }
   }
 
-  // Save Edit
-  async function handleSaveEdit(e) {
-    e.preventDefault();
-    if (!editingRecord) return;
+  // Handle Confirm Save Import Data
+  async function handleConfirmSaveImport() {
+    if (!previewModal.rows || previewModal.rows.length === 0) return;
 
-    if (!editForm.nik.trim() || !editForm.nama.trim()) {
-      toast.error('NIK dan Nama Peserta wajib diisi');
-      return;
-    }
-
-    setSavingEdit(true);
-    const toastId = toast.loading('Memperbarui data soft skill...');
+    setSavingImport(true);
+    const toastId = toast.loading('Menyimpan data List Soft Skill ke Supabase...');
 
     try {
-      const res = await fetch(`/api/list-soft-skill/${editingRecord.id}`, {
-        method: 'PUT',
+      const res = await fetch('/api/list-soft-skill/import', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({
+          action: 'save',
+          rows: previewModal.rows,
+        }),
       });
 
       const json = await res.json();
       if (res.ok && json.ok) {
-        toast.success('Data soft skill berhasil diperbarui!', { id: toastId });
-        setEditingRecord(null);
+        toast.success(json.message || 'Data List Soft Skill berhasil disimpan!', { id: toastId });
+        setPreviewModal({ isOpen: false, rows: [], totalRows: 0 });
         fetchRecords();
       } else {
-        toast.error(json.error || 'Gagal memperbarui data', { id: toastId });
+        toast.error(json.error || 'Gagal menyimpan data ke database', { id: toastId });
       }
     } catch (err) {
       toast.error('Terjadi kesalahan: ' + err.message, { id: toastId });
     } finally {
-      setSavingEdit(false);
+      setSavingImport(false);
     }
   }
 
-  // Delete Single
-  async function confirmDeleteSingle() {
-    if (!deleteSingleDialog.record) return;
-    setDeleteSingleDialog((prev) => ({ ...prev, loading: true }));
-
-    try {
-      const res = await fetch(`/api/list-soft-skill/${deleteSingleDialog.record.id}`, {
-        method: 'DELETE',
-      });
-      const json = await res.json();
-      if (res.ok && json.ok) {
-        toast.success('Data soft skill berhasil dihapus');
-        setDeleteSingleDialog({ isOpen: false, record: null, loading: false });
-        fetchRecords();
-      } else {
-        toast.error(json.error || 'Gagal menghapus data');
-        setDeleteSingleDialog((prev) => ({ ...prev, loading: false }));
-      }
-    } catch (err) {
-      toast.error('Terjadi kesalahan: ' + err.message);
-      setDeleteSingleDialog((prev) => ({ ...prev, loading: false }));
-    }
-  }
-
-  // Delete All
-  async function confirmDeleteAll() {
+  // Handle Clear All Data
+  async function handleClearAllConfirm() {
     setDeleteAllDialog((prev) => ({ ...prev, loading: true }));
-
     try {
-      const res = await fetch('/api/list-soft-skill', {
-        method: 'DELETE',
-      });
+      const res = await fetch('/api/list-soft-skill', { method: 'DELETE' });
       const json = await res.json();
       if (res.ok && json.ok) {
-        toast.success('Semua data list soft skill di cabang Anda berhasil dibersihkan');
+        toast.success('Semua data List Soft Skill cabang berhasil dihapus');
         setDeleteAllDialog({ isOpen: false, loading: false });
         fetchRecords();
       } else {
-        toast.error(json.error || 'Gagal menghapus semua data');
+        toast.error(json.error || 'Gagal menghapus data');
         setDeleteAllDialog((prev) => ({ ...prev, loading: false }));
       }
     } catch (err) {
-      toast.error('Terjadi kesalahan: ' + err.message);
+      toast.error('Kesalahan koneksi saat menghapus data');
       setDeleteAllDialog((prev) => ({ ...prev, loading: false }));
     }
   }
 
-  // Filter records
+  // Filtered & Paginated Data
   const filteredRecords = records.filter((r) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
+    if (!search.trim()) return true;
+    const query = search.toLowerCase();
     return (
-      (r.nik && String(r.nik).toLowerCase().includes(term)) ||
-      (r.nama && String(r.nama).toLowerCase().includes(term)) ||
-      (r.jabatan && String(r.jabatan).toLowerCase().includes(term)) ||
-      (r.detail_alasan && String(r.detail_alasan).toLowerCase().includes(term))
+      String(r.nik || '').toLowerCase().includes(query) ||
+      String(r.nama || '').toLowerCase().includes(query) ||
+      String(r.jabatan || '').toLowerCase().includes(query) ||
+      String(r.kategory || r.kategori || '').toLowerCase().includes(query) ||
+      String(r.detail_alasan || '').toLowerCase().includes(query)
     );
   });
 
+  const totalPages = Math.ceil(filteredRecords.length / limit) || 1;
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * limit, currentPage * limit);
+
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-100 shadow-soft">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-indigo-50 text-indigo-700 rounded-2xl border border-indigo-100">
-              <FileText className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black text-gray-900 font-title">
-                  List Soft Skill
-                </h1>
-                <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-full bg-indigo-100 text-indigo-800">
-                  Sheet: list_soft_skill
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Kelola data peserta gagal/tidak hadir training soft skill cabang yang langsung terintegrasi dengan Berita Acara Soft Skill di menu Cetak Bukti PDF.
-              </p>
-            </div>
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".xlsx, .xls, .csv"
+        className="hidden"
+      />
+
+      {/* Header Halaman */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-100 shadow-soft flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 font-title tracking-tight flex items-center gap-2">
+              <GraduationCap className="w-7 h-7 text-[#0056b3]" />
+              List Soft Skill
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0056b3] text-[11px] font-bold border border-blue-200">
+              Impor & Ekspor (Read-Only)
+            </span>
           </div>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
+            Menu khusus impor/ekspor data peserta Soft Skill per cabang.
+          </p>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Tombol Impor Excel/CSV */}
-            <button
-              type="button"
-              onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all border border-indigo-200/80"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>Impor Excel/CSV</span>
-            </button>
+        {/* Tombol Aksi Utama */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Tombol Impor Data */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0056b3] hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer min-h-[40px]"
+          >
+            <UploadCloud className="w-4 h-4" />
+            <span>Impor Data (.xlsx/.csv)</span>
+          </button>
 
-            {/* Tombol Ekspor XLSX */}
-            <a
-              href="/api/list-soft-skill/export?format=xlsx"
-              download
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all border border-emerald-200/80"
-            >
-              <Download className="w-4 h-4" />
-              <span>Ekspor Excel</span>
-            </a>
+          {/* Tombol Unduh Template */}
+          <a
+            href="/api/list-soft-skill/export?template=true"
+            download
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs sm:text-sm font-bold shadow-xs transition-all min-h-[40px]"
+            title="Unduh format template Excel kosong"
+          >
+            <FileDown className="w-4 h-4 text-amber-600" />
+            <span>Unduh Template</span>
+          </a>
 
-            {/* Tombol Ekspor CSV */}
-            <a
-              href="/api/list-soft-skill/export?format=csv"
-              download
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold transition-all border border-teal-200/80"
-            >
-              <Download className="w-4 h-4" />
-              <span>Ekspor CSV</span>
-            </a>
+          {/* Tombol Ekspor Excel */}
+          <a
+            href="/api/list-soft-skill/export?format=xlsx"
+            download
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all min-h-[40px]"
+          >
+            <Download className="w-4 h-4" />
+            <span>Ekspor Excel</span>
+          </a>
 
-            {/* Tombol Refresh */}
-            <button
-              type="button"
-              onClick={fetchRecords}
-              disabled={loadingList}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-all disabled:opacity-50"
-              title="Refresh data"
-            >
-              <RefreshCw className={`w-4 h-4 ${loadingList ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
+          {/* Tombol Ekspor CSV */}
+          <a
+            href="/api/list-soft-skill/export?format=csv"
+            download
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-bold shadow-xs transition-all min-h-[40px]"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-gray-500" />
+            <span>CSV</span>
+          </a>
+
+          {/* Cetak PDF */}
+          <Link
+            href="/cetak"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs sm:text-sm font-bold transition-all min-h-[40px]"
+          >
+            <Printer className="w-4 h-4 text-gray-600" />
+            <span>Cetak PDF</span>
+          </Link>
         </div>
       </div>
 
-      {/* Tabel Data Soft Skill */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-soft overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/50">
-          <div className="flex items-center gap-2">
-            <TableProperties className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-sm font-bold text-gray-900 font-title">
-              Daftar Peserta Soft Skill ({filteredRecords.length} Baris)
-            </h2>
+      {/* Baris Filter & Cari */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-soft space-y-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Box Pencarian */}
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Cari NIK, Nama, Jabatan..."
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:border-[#0056b3] focus:bg-white transition-all"
+            />
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Input Pencarian */}
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Cari NIK, nama, atau alasan..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-600"
-              />
-            </div>
-
-            {/* Tombol Hapus Semua Data */}
+          <div className="flex items-center justify-between w-full sm:w-auto gap-3">
+            {/* Tombol Hapus Semua Data Cabang */}
             {records.length > 0 && (
               <button
                 type="button"
                 onClick={() => setDeleteAllDialog({ isOpen: true, loading: false })}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-all shrink-0 border border-red-200/80"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-all"
               >
-                <Trash className="w-3.5 h-3.5" />
-                <span>Hapus Semua</span>
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Hapus Semua Data</span>
               </button>
             )}
+
+            {/* Total Data Badge */}
+            <div className="text-xs text-gray-500 font-semibold bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
+              Total Data: <span className="font-bold text-[#0056b3]">{filteredRecords.length}</span>
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        {/* Tabel Data Read-Only (Exact 5 Header Columns: NIK | Nama | Jabatan | Kategory | Detail Alasan) */}
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <table className="w-full text-left text-xs sm:text-sm border-collapse">
             <thead>
-              <tr className="bg-gray-100/80 text-gray-700 uppercase font-bold tracking-wider border-b border-gray-200">
-                <th className="p-3 text-center w-12">No</th>
-                <th className="p-3 text-center w-28">NIK</th>
-                <th className="p-3">Nama Peserta</th>
-                <th className="p-3">Jabatan</th>
-                <th className="p-3 text-center">Kategori</th>
-                <th className="p-3">Detail Alasan</th>
-                <th className="p-3 text-center w-24">Aksi</th>
+              <tr className="bg-gray-100 text-gray-800 font-bold uppercase tracking-wider text-[11px] border-b border-gray-200">
+                <th className="px-4 py-3 text-center border-r border-gray-200 w-36">NIK</th>
+                <th className="px-4 py-3 border-r border-gray-200">Nama</th>
+                <th className="px-4 py-3 border-r border-gray-200">Jabatan</th>
+                <th className="px-4 py-3 text-center border-r border-gray-200 w-32">Kategory</th>
+                <th className="px-4 py-3">Detail Alasan</th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-gray-100">
-              {loadingList ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500">
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-                      <span>Memuat data soft skill...</span>
+                  <td colSpan={5} className="p-8 text-center text-gray-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-[#0056b3]" />
+                      <span>Memuat data List Soft Skill...</span>
                     </div>
                   </td>
                 </tr>
-              ) : filteredRecords.length > 0 ? (
-                filteredRecords.map((r, i) => (
-                  <tr key={r.id || i} className="hover:bg-indigo-50/30 transition-colors">
-                    <td className="p-3 text-center font-bold text-gray-700">{r.no || i + 1}</td>
-                    <td className="p-3 text-center font-mono font-bold text-gray-900">{r.nik}</td>
-                    <td className="p-3 font-semibold text-gray-900 uppercase">{r.nama}</td>
-                    <td className="p-3 font-medium text-gray-700">{r.jabatan || '-'}</td>
-                    <td className="p-3 text-center font-medium text-gray-700">{r.kategori || r.kategory || '-'}</td>
-                    <td className="p-3 font-medium text-gray-600">{r.detail_alasan || '-'}</td>
-                    <td className="p-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(r)}
-                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Edit baris ini"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteSingleDialog({ isOpen: true, record: r, loading: false })}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Hapus baris ini"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+              ) : paginatedRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-10 text-center text-gray-500">
+                    <div className="max-w-xs mx-auto space-y-2">
+                      <GraduationCap className="w-10 h-10 text-gray-300 mx-auto" />
+                      <p className="font-bold text-gray-700">Belum ada data List Soft Skill</p>
+                      <p className="text-xs text-gray-400">
+                        Gunakan tombol <strong>&quot;Impor Data&quot;</strong> di atas untuk mengunggah berkas Excel/CSV.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedRecords.map((row, idx) => (
+                  <tr key={row.id || idx} className="hover:bg-blue-50/40 transition-colors">
+                    <td className="px-4 py-3 text-center font-mono font-bold text-gray-800 border-r border-gray-100">
+                      {String(row.nik || '-')}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-gray-900 uppercase border-r border-gray-100">
+                      {row.nama || '-'}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-gray-700 border-r border-gray-100">
+                      {row.jabatan || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-center border-r border-gray-100">
+                      <span className="inline-block px-2.5 py-0.5 rounded-md bg-blue-100 text-[#0056b3] text-[11px] font-bold uppercase">
+                        {row.kategory || row.kategori || '-'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {row.detail_alasan || '-'}
                     </td>
                   </tr>
                 ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500 italic">
-                    Belum ada data soft skill. Silakan impor dari file Excel/CSV.
-                  </td>
-                </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Modal Edit Record */}
-      {editingRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in duration-200">
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl">
-                  <Edit2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-gray-900 font-title">
-                    Edit Data Soft Skill
-                  </h2>
-                  <p className="text-xs text-gray-500">
-                    Baris No. #{editForm.no || '-'}
-                  </p>
-                </div>
-              </div>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <div className="text-xs text-gray-500 font-medium">
+              Menampilkan {Math.min((currentPage - 1) * limit + 1, filteredRecords.length)} -{' '}
+              {Math.min(currentPage * limit, filteredRecords.length)} dari {filteredRecords.length} data
+            </div>
+
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setEditingRecord(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="px-3 py-1 text-xs font-bold text-gray-800">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modal Preview Impor Sebelum Simpan */}
+      {previewModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-200 bg-blue-50/70 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-gray-900 font-title flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-[#0056b3]" />
+                  Preview Data List Soft Skill
+                </h2>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Ditemukan <strong className="text-[#0056b3]">{previewModal.totalRows} baris</strong> data valid.
+                  Silakan periksa sebelum disimpan.
+                </p>
+              </div>
+              <button
+                onClick={() => setPreviewModal({ isOpen: false, rows: [], totalRows: 0 })}
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-200"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="p-5 space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">
-                    NIK Peserta <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editForm.nik}
-                    onChange={(e) => setEditForm({ ...editForm, nik: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-mono font-medium focus:bg-white focus:ring-2 focus:ring-indigo-600"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">
-                    Nama Peserta <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editForm.nama}
-                    onChange={(e) => setEditForm({ ...editForm, nama: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium uppercase focus:bg-white focus:ring-2 focus:ring-indigo-600"
-                  />
-                </div>
+            {/* Modal Content Table */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-3">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  Data ini akan disimpan ke tabel <strong>list_soft_skill</strong> untuk cabang Anda (
+                  <strong>{meta?.userBranchName || 'Cabang Aktif'}</strong>).
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Jabatan</label>
-                  <input
-                    type="text"
-                    value={editForm.jabatan}
-                    onChange={(e) => setEditForm({ ...editForm, jabatan: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-600"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Kategori</label>
-                  <input
-                    type="text"
-                    value={editForm.kategori}
-                    onChange={(e) => setEditForm({ ...editForm, kategori: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-600"
-                  />
-                </div>
+              <div className="overflow-x-auto border border-gray-200 rounded-xl max-h-96">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-gray-100 font-bold uppercase text-[10px] text-gray-700 sticky top-0 border-b border-gray-200">
+                    <tr>
+                      <th className="px-3 py-2 text-center border-r border-gray-200 w-32">NIK</th>
+                      <th className="px-3 py-2 border-r border-gray-200">Nama</th>
+                      <th className="px-3 py-2 border-r border-gray-200">Jabatan</th>
+                      <th className="px-3 py-2 text-center border-r border-gray-200">Kategory</th>
+                      <th className="px-3 py-2">Detail Alasan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {previewModal.rows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-center font-mono font-bold border-r border-gray-100">{row.nik}</td>
+                        <td className="px-3 py-2 font-bold text-gray-900 border-r border-gray-100">{row.nama}</td>
+                        <td className="px-3 py-2 border-r border-gray-100">{row.jabatan}</td>
+                        <td className="px-3 py-2 text-center border-r border-gray-100">{row.kategory || row.kategori}</td>
+                        <td className="px-3 py-2">{row.detail_alasan}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            </div>
 
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">Detail Alasan</label>
-                <textarea
-                  rows={3}
-                  value={editForm.detail_alasan}
-                  onChange={(e) => setEditForm({ ...editForm, detail_alasan: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-600"
-                />
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setEditingRecord(null)}
-                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-bold hover:bg-gray-50"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingEdit}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md disabled:opacity-50"
-                >
-                  {savingEdit ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      <span>Simpan Perubahan</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+            {/* Modal Actions */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPreviewModal({ isOpen: false, rows: [], totalRows: 0 })}
+                disabled={importing}
+                className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 text-xs font-bold transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSaveImport}
+                disabled={importing}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0056b3] hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50"
+              >
+                {importing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Konfirmasi & Simpan ({previewModal.totalRows} Baris)</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Modal Impor File Excel/CSV */}
-      <ImportExportModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onImportSuccess={() => fetchRecords()}
-        importEndpoint="/api/list-soft-skill/import"
-        title="Impor List Soft Skill (list_soft_skill)"
-      />
-
-      {/* Dialog Konfirmasi Hapus Single */}
-      <ConfirmDialog
-        isOpen={deleteSingleDialog.isOpen}
-        title="Hapus Data Soft Skill"
-        message={`Apakah Anda yakin ingin menghapus data peserta "${deleteSingleDialog.record?.nama}" (${deleteSingleDialog.record?.nik})?`}
-        confirmLabel="Ya, Hapus"
-        cancelLabel="Batal"
-        variant="danger"
-        loading={deleteSingleDialog.loading}
-        onConfirm={confirmDeleteSingle}
-        onCancel={() => setDeleteSingleDialog({ isOpen: false, record: null, loading: false })}
-      />
-
-      {/* Dialog Konfirmasi Hapus Semua */}
+      {/* Confirm Dialog Hapus Semua Data */}
       <ConfirmDialog
         isOpen={deleteAllDialog.isOpen}
-        title="Bersihkan Semua Data Soft Skill"
-        message="PERINGATAN: Seluruh data list soft skill di cabang Anda akan dihapus permanen. Tindakan ini tidak dapat dibatalkan!"
+        title="Hapus Semua Data List Soft Skill?"
+        message="Tindakan ini akan menghapus seluruh data List Soft Skill milik cabang Anda. Data yang dihapus tidak dapat dikembalikan."
         confirmLabel="Ya, Hapus Semua"
         cancelLabel="Batal"
-        variant="danger"
-        loading={deleteAllDialog.loading}
-        onConfirm={confirmDeleteAll}
+        isLoading={deleteAllDialog.loading}
+        onConfirm={handleClearAllConfirm}
         onCancel={() => setDeleteAllDialog({ isOpen: false, loading: false })}
       />
     </div>

@@ -37,6 +37,7 @@ export default function Sidebar({
     { href: '/input-tambahan', label: 'Input Data Tambahan', icon: UserPlus },
     { href: '/list-tidak-hadir', label: 'List Tidak Hadir Training', icon: ClipboardList },
     { href: '/rekap', label: 'Rekap Data', icon: FileSpreadsheet },
+    { href: '/soft-skill', label: 'List Soft Skill', icon: GraduationCap },
     { href: '/import', label: 'Impor Excel/CSV', icon: UploadCloud },
     { href: '/cetak', label: 'Cetak Bukti PDF', icon: Printer },
     { href: '/tentang', label: 'Tentang Aplikasi', icon: Info },
