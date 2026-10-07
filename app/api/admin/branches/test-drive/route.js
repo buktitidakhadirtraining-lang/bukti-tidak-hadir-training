@@ -15,46 +15,89 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    let { branch_id, drive_bridge_url, drive_bridge_secret } = body;
+    let { branch_id, drive_bridge_url, drive_bridge_secret } = body || {};
 
-    let targetUrl = drive_bridge_url ? drive_bridge_url.trim() : null;
-    let targetSecret = drive_bridge_secret ? drive_bridge_secret.trim() : null;
+    let targetUrl = drive_bridge_url ? String(drive_bridge_url).trim() : '';
+    let secretToUse = null;
+    let secretSource = 'none';
 
-    // Jika secret tidak disertakan langsung (misal saat edit data cabang yang sudah ada), ambil dari database
-    if (branch_id && (!targetSecret || !targetUrl)) {
+    // Cek apakah admin mengetik secret baru di kolom (bukan placeholder dot '•' dan tidak kosong)
+    const isNewInputSecret =
+      drive_bridge_secret &&
+      typeof drive_bridge_secret === 'string' &&
+      drive_bridge_secret.trim().length > 0 &&
+      !drive_bridge_secret.includes('•');
+
+    if (isNewInputSecret) {
+      secretToUse = drive_bridge_secret.trim();
+      secretSource = 'input_baru';
+    } else if (branch_id) {
+      // Ambil secret tersimpan di database untuk cabang ini
       const supabase = getSupabaseAdmin();
       const { data: branch, error } = await supabase
         .from('branches')
         .select('drive_bridge_url, drive_bridge_secret_enc')
         .eq('id', branch_id)
-        .single();
+        .maybeSingle();
 
-      if (error || !branch || !branch.drive_bridge_url || !branch.drive_bridge_secret_enc) {
+      if (error || !branch) {
         return NextResponse.json(
-          { ok: false, error: 'Cabang belum memiliki URL dan Secret Drive Bridge tersimpan' },
+          { ok: false, error: 'Data cabang tidak ditemukan di database' },
           { status: 400 }
         );
       }
 
-      if (!targetUrl) targetUrl = branch.drive_bridge_url;
-      if (!targetSecret) targetSecret = decryptSecret(branch.drive_bridge_secret_enc);
+      if (!targetUrl && branch.drive_bridge_url) {
+        targetUrl = String(branch.drive_bridge_url).trim();
+      }
+
+      if (!branch.drive_bridge_secret_enc) {
+        return NextResponse.json(
+          { ok: false, error: 'Cabang belum memiliki Secret Drive Bridge tersimpan. Silakan masukkan Secret Key baru.' },
+          { status: 400 }
+        );
+      }
+
+      const decrypted = decryptSecret(branch.drive_bridge_secret_enc);
+      if (!decrypted || !decrypted.trim()) {
+        return NextResponse.json(
+          { ok: false, error: 'Secret tersimpan tidak bisa didekripsi, silakan masukkan ulang secret' },
+          { status: 400 }
+        );
+      }
+
+      secretToUse = decrypted.trim();
+      secretSource = 'database';
     }
 
-    if (!targetUrl || !targetSecret) {
+    if (!targetUrl) {
       return NextResponse.json(
-        { ok: false, error: 'URL Drive Bridge dan Secret Key wajib diisi untuk melakukan pengujian' },
+        { ok: false, error: 'URL Drive Bridge wajib diisi untuk menguji koneksi' },
         { status: 400 }
       );
     }
 
+    if (!secretToUse) {
+      return NextResponse.json(
+        { ok: false, error: 'Secret Key Drive Bridge wajib diisi untuk menguji koneksi cabang baru' },
+        { status: 400 }
+      );
+    }
+
+    // Panggil drivePing dari server (menghindari CORS) dengan logging aman (tanpa mencetak plaintext secret)
     const testRes = await drivePing({
       url: targetUrl,
-      secret: targetSecret,
+      secret: secretToUse,
+      source: secretSource,
     });
 
     if (!testRes.ok) {
       return NextResponse.json({ ok: false, error: testRes.error || 'Uji koneksi gagal' }, { status: 400 });
     }
+
+    console.log(
+      `[Test Drive Bridge Result] Success: Folder "${testRes.folderName}" | Source: ${secretSource}`
+    );
 
     return NextResponse.json({
       ok: true,
@@ -62,7 +105,7 @@ export async function POST(request) {
       folderName: testRes.folderName,
     });
   } catch (err) {
-    console.error('[Test Drive Bridge Error]:', err);
+    console.error('[Test Drive Bridge Error]:', err.message || err);
     return NextResponse.json(
       { ok: false, error: err.message || 'Gagal menguji koneksi Google Drive Bridge' },
       { status: 400 }

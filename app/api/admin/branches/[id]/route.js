@@ -31,7 +31,13 @@ export async function PUT(request, { params }) {
     }
     if (is_active !== undefined) updatePayload.is_active = Boolean(is_active);
 
-    if (drive_bridge_secret !== undefined && drive_bridge_secret.trim()) {
+    // Secret hanya diperbarui jika admin mengetik secret baru (bukan placeholder dot '•' dan tidak kosong)
+    if (
+      drive_bridge_secret !== undefined &&
+      typeof drive_bridge_secret === 'string' &&
+      drive_bridge_secret.trim().length > 0 &&
+      !drive_bridge_secret.includes('•')
+    ) {
       updatePayload.drive_bridge_secret_enc = encryptSecret(drive_bridge_secret.trim());
     }
 

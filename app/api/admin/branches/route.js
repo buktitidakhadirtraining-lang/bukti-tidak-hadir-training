@@ -60,7 +60,12 @@ export async function POST(request) {
     }
 
     let encryptedSecret = null;
-    if (drive_bridge_secret && drive_bridge_secret.trim()) {
+    if (
+      drive_bridge_secret &&
+      typeof drive_bridge_secret === 'string' &&
+      drive_bridge_secret.trim().length > 0 &&
+      !drive_bridge_secret.includes('•')
+    ) {
       encryptedSecret = encryptSecret(drive_bridge_secret.trim());
     }
 

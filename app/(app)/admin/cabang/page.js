@@ -81,13 +81,18 @@ export default function AdminCabangPage() {
   }
 
   async function handleTestDrive() {
-    if (!formBridgeUrl.trim()) {
+    const cleanUrl = formBridgeUrl ? formBridgeUrl.trim() : '';
+    const cleanSecret = formBridgeSecret ? formBridgeSecret.trim() : '';
+
+    if (!cleanUrl) {
       toast.error('URL Drive Bridge wajib diisi untuk menguji koneksi');
       return;
     }
 
-    if (!formBridgeSecret.trim() && !editingBranch?.has_drive_bridge) {
-      toast.error('Secret Drive Bridge wajib diisi untuk menguji koneksi');
+    const isNewSecretTyped = cleanSecret.length > 0 && !cleanSecret.includes('•');
+
+    if (!isNewSecretTyped && !editingBranch?.has_drive_bridge) {
+      toast.error('Secret Drive Bridge wajib diisi untuk menguji koneksi cabang baru');
       return;
     }
 
@@ -97,15 +102,17 @@ export default function AdminCabangPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          branch_id: editingBranch?.id,
-          drive_bridge_url: formBridgeUrl.trim(),
-          drive_bridge_secret: formBridgeSecret.trim() || undefined,
+          branch_id: editingBranch?.id || undefined,
+          drive_bridge_url: cleanUrl,
+          drive_bridge_secret: isNewSecretTyped ? cleanSecret : undefined,
         }),
       });
 
       const json = await res.json();
       if (res.ok && json.ok) {
-        toast.success(json.message);
+        toast.success(
+          json.message || `Koneksi Google Drive Berhasil! Folder "${json.folderName}" dapat diakses.`
+        );
       } else {
         toast.error(json.error || 'Uji koneksi Google Drive Bridge gagal');
       }
@@ -123,6 +130,9 @@ export default function AdminCabangPage() {
       return;
     }
 
+    const cleanSecret = formBridgeSecret ? formBridgeSecret.trim() : '';
+    const isNewSecretTyped = cleanSecret.length > 0 && !cleanSecret.includes('•');
+
     setSaving(true);
     try {
       const url = editingBranch ? `/api/admin/branches/${editingBranch.id}` : '/api/admin/branches';
@@ -135,8 +145,8 @@ export default function AdminCabangPage() {
         is_active: formIsActive,
       };
 
-      if (formBridgeSecret.trim()) {
-        payload.drive_bridge_secret = formBridgeSecret.trim();
+      if (isNewSecretTyped) {
+        payload.drive_bridge_secret = cleanSecret;
       }
 
       const res = await fetch(url, {
