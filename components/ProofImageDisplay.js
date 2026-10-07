@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, ImageOff, ImageIcon, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, ImageIcon, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { photoLoader } from '../lib/photo-loader.js';
 
 export default function ProofImageDisplay({
@@ -43,6 +43,7 @@ export default function ProofImageDisplay({
   const error = photoState?.error;
   const isHeic = photoState?.isHeic;
   const dataUrl = photoState?.dataUrl;
+  const isOutdatedScript = photoState?.isOutdatedScript;
 
   // Jika kandidat saat ini gagal dan masih ada kandidat foto lain untuk peserta yang sama, coba berikutnya
   useEffect(() => {
@@ -96,15 +97,17 @@ export default function ProofImageDisplay({
     );
   }
 
-  // Tampilan Error yang Informatif & Tidak Menelan Masalah
+  // Tampilan Error / Placeholder Informatif
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center text-center p-2 bg-red-50/60 rounded-xs border border-red-200 text-[10px] text-red-700 select-none">
-      <AlertCircle className="w-4 h-4 text-red-500 mb-1 shrink-0" />
-      <span className="font-bold leading-tight">Foto gagal dimuat</span>
-      <span className="text-[9px] text-red-600 mt-0.5 max-w-[90%] break-words leading-tight line-clamp-2">
+    <div className="w-full h-full flex flex-col items-center justify-center text-center p-2 bg-amber-50/70 rounded-xs border border-amber-200 text-[10px] text-amber-900 select-none">
+      <AlertCircle className="w-4 h-4 text-amber-600 mb-1 shrink-0" />
+      <span className="font-bold leading-tight">
+        {isOutdatedScript ? 'Apps Script Perlu Update (v5)' : 'Foto Tidak Tersedia'}
+      </span>
+      <span className="text-[9px] text-amber-800 mt-0.5 max-w-[95%] break-words leading-tight">
         {isHeic
           ? 'Format HEIC/HEIF tidak didukung browser, ganti dengan JPG/PNG'
-          : error || '404 file tidak ditemukan'}
+          : error || 'Foto tidak ada di Drive. Upload ulang melalui Riwayat Data Input.'}
       </span>
       <button
         type="button"
@@ -114,11 +117,11 @@ export default function ProofImageDisplay({
             photoLoader.load(currentId);
           }
         }}
-        className="no-print mt-1.5 px-2 py-0.5 text-[9px] font-semibold bg-white hover:bg-red-100 text-red-700 rounded border border-red-300 shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
-        title="Coba muat ulang foto ini"
+        className="no-print mt-1.5 px-2 py-0.5 text-[9px] font-semibold bg-white hover:bg-amber-100 text-amber-800 rounded border border-amber-300 shadow-2xs flex items-center gap-1 transition-colors cursor-pointer"
+        title="Coba muat ulang atau pulihkan foto ini"
       >
         <RefreshCw className="w-2.5 h-2.5" />
-        Coba Lagi
+        Coba Lagi / Pulihkan
       </button>
     </div>
   );

@@ -23,6 +23,10 @@ import {
   RotateCcw,
   UserCheck,
   ImageIcon,
+  Sparkles,
+  Search,
+  XCircle,
+  FileCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -433,20 +437,169 @@ export default function CetakPage() {
         : records;
 
     for (const r of relevantRecords) {
-      if (!r.drive_file_id || r.file_mime_type === 'application/pdf') continue;
       const state = photoCache.get(r.id);
       if (state && state.status === 'error') {
         list.push({
           id: r.id,
           nik: r.nik,
           nama: r.nama_peserta,
-          error: state.error || 'Gagal memuat',
+          error: state.error || 'Foto tidak ada di Drive. Upload ulang melalui Riwayat Data Input.',
           isHeic: state.isHeic,
+          isOutdatedScript: state.isOutdatedScript,
         });
       }
     }
     return list;
   }, [records, filteredSoftSkillData, printFormat, photoCache]);
+
+  // Kumpulkan daftar foto yang berhasil dipulihkan lewat Self-Healing (perlu perbaikan DB)
+  const healedPhotosList = useMemo(() => {
+    const list = [];
+    const relevantRecords =
+      printFormat === 'soft_skill'
+        ? records.filter((r) =>
+            filteredSoftSkillData.some(
+              (p) => String(p.nik).trim() === String(r.nik).trim()
+            )
+          )
+        : records;
+
+    for (const r of relevantRecords) {
+      const state = photoCache.get(r.id);
+      if (state && state.isHealed && state.healedFileId) {
+        list.push({
+          id: r.id,
+          nik: r.nik,
+          nama: r.nama_peserta,
+          originalFileId: r.drive_file_id,
+          healedFileId: state.healedFileId,
+          fileName: state.fileName,
+          foundCount: state.foundCount || 1,
+          note: state.note,
+        });
+      }
+    }
+    return list;
+  }, [records, filteredSoftSkillData, printFormat, photoCache]);
+
+  // State & Handler Perbaikan Referensi Database
+  const [isFixingReference, setIsFixingReference] = useState(false);
+
+  const handleFixReferences = async (items) => {
+    if (!items || items.length === 0) return;
+    setIsFixingReference(true);
+    const toastId = toast.loading('Memperbarui referensi ID foto di database...');
+
+    try {
+      const res = await fetch('/api/records/fix-reference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+      const json = await res.json();
+
+      if (res.ok && json.ok) {
+        toast.success(
+          json.message || `Berhasil memperbarui referensi ID foto untuk ${json.updatedCount} peserta!`,
+          { id: toastId }
+        );
+        photoLoader.clear();
+        syncSpreadsheet(false);
+      } else {
+        toast.error(json.error || 'Gagal memperbarui referensi ID foto', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan jaringan saat memperbarui referensi: ' + err.message, { id: toastId });
+    } finally {
+      setIsFixingReference(false);
+    }
+  };
+
+  // State & Handler Alat Bantu "Cek Foto Cabang"
+  const [isPhotoCheckModalOpen, setIsPhotoCheckModalOpen] = useState(false);
+  const [photoCheckProgress, setPhotoCheckProgress] = useState({ current: 0, total: 0, isChecking: false });
+  const [photoCheckResults, setPhotoCheckResults] = useState([]);
+
+  const handleRunBranchPhotoCheck = async () => {
+    const relevantRecords =
+      printFormat === 'soft_skill'
+        ? records.filter((r) =>
+            filteredSoftSkillData.some(
+              (p) => String(p.nik).trim() === String(r.nik).trim()
+            )
+          )
+        : records;
+
+    if (!relevantRecords || relevantRecords.length === 0) {
+      toast.info('Tidak ada record foto peserta yang perlu diperiksa.');
+      return;
+    }
+
+    setIsPhotoCheckModalOpen(true);
+    setPhotoCheckProgress({ current: 0, total: relevantRecords.length, isChecking: true });
+    setPhotoCheckResults([]);
+
+    const results = [];
+    const concurrency = 3;
+    let index = 0;
+
+    const worker = async () => {
+      while (index < relevantRecords.length) {
+        const i = index++;
+        const rec = relevantRecords[i];
+        if (!rec) continue;
+
+        try {
+          const res = await fetch(`/api/records/${rec.id}/file?json=true&checkOnly=true`);
+          const json = await res.json().catch(() => ({}));
+
+          if (res.ok && json.ok) {
+            results.push({
+              id: rec.id,
+              nik: rec.nik,
+              nama: rec.nama_peserta,
+              status: json.status || (json.isHealed ? 'RESTORED' : 'OK'),
+              healedFileId: json.healedFileId || null,
+              originalFileId: rec.drive_file_id,
+              fileName: json.fileName,
+              message: json.isHealed
+                ? json.note || 'ID usang ➔ berhasil dipulihkan'
+                : 'Tersambung (ID Valid)',
+            });
+          } else {
+            results.push({
+              id: rec.id,
+              nik: rec.nik,
+              nama: rec.nama_peserta,
+              status: json.isOutdatedScript ? 'OUTDATED_SCRIPT' : 'NOT_IN_DRIVE',
+              message: json.isOutdatedScript
+                ? 'Apps Script cabang belum diperbarui ke versi terbaru (v5), lakukan deploy Versi baru'
+                : json.error || 'Foto tidak ada di Drive. Upload ulang melalui Riwayat Data Input.',
+            });
+          }
+        } catch (err) {
+          results.push({
+            id: rec.id,
+            nik: rec.nik,
+            nama: rec.nama_peserta,
+            status: 'ERROR',
+            message: 'Gagal jaringan: ' + err.message,
+          });
+        } finally {
+          setPhotoCheckProgress((prev) => ({ ...prev, current: prev.current + 1 }));
+        }
+      }
+    };
+
+    const workers = [];
+    for (let c = 0; c < Math.min(concurrency, relevantRecords.length); c++) {
+      workers.push(worker());
+    }
+    await Promise.all(workers);
+
+    setPhotoCheckResults(results);
+    setPhotoCheckProgress((prev) => ({ ...prev, isChecking: false }));
+  };
 
   function handlePrint() {
     if (failedPhotosList.length > 0) {
@@ -2265,50 +2418,145 @@ export default function CetakPage() {
         </div>
       )}
 
-      {/* Panel Peringatan Foto Gagal Dimuat (Tidak Tercetak di Kertas) */}
-      {failedPhotosList.length > 0 && (
-        <div className="no-print max-w-4xl mx-auto mb-4 p-3.5 bg-amber-50 border border-amber-300 rounded-xl shadow-xs text-xs text-amber-900">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-amber-200">
-            <div className="flex items-center gap-2 font-bold text-amber-800">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Peringatan: {failedPhotosList.length} Foto Bukti Belum Berhasil Dimuat</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                photoLoader.retryFailed();
-                toast.info('Memulai ulang pemuatan foto bukti...');
-              }}
-              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs w-fit cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Muat Ulang Foto Gagal
-            </button>
-          </div>
-          <div className="mt-2 space-y-1">
-            <p className="font-semibold text-amber-800 text-[11px]">Rincian peserta dengan kendala foto:</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
-              {failedPhotosList.map((fp) => (
-                <div
-                  key={fp.id}
-                  className="p-1.5 bg-white/90 rounded border border-amber-200 text-[11px] flex items-start gap-1.5"
-                >
-                  <span className="font-mono font-bold text-gray-800 shrink-0">{fp.nik}</span>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-bold text-gray-900 truncate block">{fp.nama}</span>
-                    <span className="text-red-600 text-[10px] block leading-tight">
-                      {fp.isHeic
-                        ? 'Format HEIC/HEIF tidak didukung browser, ganti dengan JPG/PNG'
-                        : fp.error || '404 file tidak ditemukan di Drive'}
-                    </span>
-                  </div>
+      {/* Panel Status & Peringatan Foto Bukti (Self-Healing & Fix Reference) */}
+      {(failedPhotosList.length > 0 || healedPhotosList.length > 0 || isPhotoCheckModalOpen) && (
+        <div className="no-print max-w-4xl mx-auto mb-4 space-y-3">
+          {/* A. Banner Foto Dipulihkan (Self-Healing Active) */}
+          {healedPhotosList.length > 0 && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl shadow-xs text-xs text-emerald-950">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-emerald-200">
+                <div className="flex items-center gap-2 font-bold text-emerald-900">
+                  <Sparkles className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                  <span>
+                    Pemulihan Otomatis: {healedPhotosList.length} Foto Berhasil Dipulihkan via Self-Healing
+                  </span>
                 </div>
-              ))}
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    disabled={isFixingReference}
+                    onClick={() =>
+                      handleFixReferences(
+                        healedPhotosList.map((hp) => ({
+                          id: hp.id,
+                          drive_file_id: hp.healedFileId,
+                          drive_file_name: hp.fileName,
+                        }))
+                      )
+                    }
+                    className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 disabled:bg-gray-400 text-white font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    {isFixingReference ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
+                    Perbaiki Semua Referensi DB ({healedPhotosList.length})
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-2 space-y-1">
+                <p className="font-semibold text-emerald-900 text-[11px]">
+                  Foto berikut ditemukan di Drive dengan ID baru (ID lama di database usang):
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                  {healedPhotosList.map((hp) => (
+                    <div
+                      key={hp.id}
+                      className="p-1.5 bg-white/90 rounded border border-emerald-200 text-[11px] flex items-center justify-between gap-1.5"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="font-mono font-bold text-gray-800">{hp.nik}</span> -{' '}
+                        <span className="font-bold text-gray-900 truncate">{hp.nama}</span>
+                        {hp.note && (
+                          <span className="text-[10px] text-emerald-700 block leading-tight font-medium">
+                            {hp.note}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isFixingReference}
+                        onClick={() =>
+                          handleFixReferences([
+                            {
+                              id: hp.id,
+                              drive_file_id: hp.healedFileId,
+                              drive_file_name: hp.fileName,
+                            },
+                          ])
+                        }
+                        className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold rounded text-[10px] shrink-0 border border-emerald-300 transition-colors cursor-pointer"
+                      >
+                        Perbaiki Referensi
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <p className="text-[10px] text-amber-700 italic mt-1">
-              💡 <em>Catatan: Anda tetap dapat mencetak atau mengunduh PDF. Sistem akan memunculkan konfirmasi sebelum proses dijalankan.</em>
-            </p>
-          </div>
+          )}
+
+          {/* B. Banner Foto Gagal Dimuat */}
+          {failedPhotosList.length > 0 && (
+            <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl shadow-xs text-xs text-amber-900">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-amber-200">
+                <div className="flex items-center gap-2 font-bold text-amber-800">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Peringatan: {failedPhotosList.length} Foto Bukti Belum Berhasil Dimuat</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleRunBranchPhotoCheck}
+                    className="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg flex items-center gap-1.5 transition-colors border border-amber-300 cursor-pointer"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    Cek Foto Cabang
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      photoLoader.retryFailed();
+                      toast.info('Memulai ulang pemuatan foto bukti...');
+                    }}
+                    className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Muat Ulang Foto Gagal
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 space-y-1">
+                <p className="font-semibold text-amber-800 text-[11px]">Rincian peserta dengan kendala foto:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                  {failedPhotosList.map((fp) => (
+                    <div
+                      key={fp.id}
+                      className="p-1.5 bg-white/90 rounded border border-amber-200 text-[11px] flex items-start gap-1.5"
+                    >
+                      <span className="font-mono font-bold text-gray-800 shrink-0">{fp.nik}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-bold text-gray-900 truncate block">{fp.nama}</span>
+                        <span className="text-red-600 text-[10px] block leading-tight">
+                          {fp.isOutdatedScript
+                            ? 'Apps Script cabang belum diperbarui ke versi terbaru (v5), lakukan deploy Versi baru'
+                            : fp.isHeic
+                            ? 'Format HEIC/HEIF tidak didukung browser, ganti dengan JPG/PNG'
+                            : fp.error || 'Foto tidak ada di Drive. Upload ulang melalui Riwayat Data Input.'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-amber-700 italic mt-1">
+                  💡 <em>Catatan: Anda tetap dapat mencetak atau mengunduh PDF. Sistem akan memunculkan konfirmasi sebelum proses dijalankan.</em>
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2684,6 +2932,212 @@ export default function CetakPage() {
             </div>
           </div>
         </div>
+        </div>
+      )}
+
+      {/* Modal Alat Bantu: Cek Foto Cabang */}
+      {isPhotoCheckModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in no-print">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 max-h-[90vh] flex flex-col">
+            <div className="indomaret-bar">
+              <div className="indomaret-bar-blue" />
+              <div className="indomaret-bar-yellow" />
+              <div className="indomaret-bar-red" />
+            </div>
+
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 text-[#0056b3] flex items-center justify-center">
+                  <Search className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 font-title">
+                    Pemeriksaan Konsistensi Foto Cabang
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Memeriksa keabsahan ID foto pada Google Drive cabang dan opsi pemulihan otomatis
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPhotoCheckModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              {/* Status Progres */}
+              {photoCheckProgress.isChecking ? (
+                <div className="p-4 bg-blue-50/80 rounded-xl border border-blue-100 space-y-2">
+                  <div className="flex items-center justify-between font-bold text-blue-900 text-xs">
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#0056b3]" />
+                      Sedang Memeriksa Foto Cabang...
+                    </span>
+                    <span>
+                      {photoCheckProgress.current} / {photoCheckProgress.total} Peserta
+                    </span>
+                  </div>
+                  <div className="w-full bg-blue-200 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-[#0056b3] h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.round(
+                          (photoCheckProgress.current / Math.max(1, photoCheckProgress.total)) * 100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                    <div className="text-lg font-black text-emerald-900">
+                      {photoCheckResults.filter((r) => r.status === 'OK').length}
+                    </div>
+                    <div className="text-[10px] text-emerald-700 font-bold uppercase mt-0.5">Tersambung (OK)</div>
+                  </div>
+
+                  <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-center">
+                    <div className="text-lg font-black text-teal-900">
+                      {photoCheckResults.filter((r) => r.status === 'RESTORED').length}
+                    </div>
+                    <div className="text-[10px] text-teal-700 font-bold uppercase mt-0.5">Dipulihkan (Perlu Fix DB)</div>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                    <div className="text-lg font-black text-amber-900">
+                      {photoCheckResults.filter((r) => r.status !== 'OK' && r.status !== 'RESTORED').length}
+                    </div>
+                    <div className="text-[10px] text-amber-700 font-bold uppercase mt-0.5">Tidak Ada / Error</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tombol Perbaiki Semua Referensi Hasil Cek */}
+              {!photoCheckProgress.isChecking &&
+                photoCheckResults.some((r) => r.status === 'RESTORED' && r.healedFileId) && (
+                  <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl flex items-center justify-between">
+                    <span className="font-bold text-teal-900 text-xs">
+                      Ditemukan {photoCheckResults.filter((r) => r.status === 'RESTORED').length} foto yang ID-nya usang dan telah dipulihkan!
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isFixingReference}
+                      onClick={() =>
+                        handleFixReferences(
+                          photoCheckResults
+                            .filter((r) => r.status === 'RESTORED' && r.healedFileId)
+                            .map((r) => ({
+                              id: r.id,
+                              drive_file_id: r.healedFileId,
+                              drive_file_name: r.fileName,
+                            }))
+                        )
+                      }
+                      className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Perbaiki Semua Referensi DB
+                    </button>
+                  </div>
+                )}
+
+              {/* Tabel Hasil */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 border-b border-gray-200 font-bold text-gray-700 uppercase tracking-wider sticky top-0">
+                    <tr>
+                      <th className="py-2.5 px-3">NIK & Nama Peserta</th>
+                      <th className="py-2.5 px-3 text-center">Status Foto</th>
+                      <th className="py-2.5 px-3">Keterangan</th>
+                      <th className="py-2.5 px-3 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {photoCheckResults.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="py-2.5 px-3">
+                          <div className="font-mono font-bold text-gray-900">{item.nik}</div>
+                          <div className="text-gray-600 truncate max-w-[180px]">{item.nama}</div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center shrink-0">
+                          {item.status === 'OK' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              OK
+                            </span>
+                          )}
+                          {item.status === 'RESTORED' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800">
+                              Dipulihkan
+                            </span>
+                          )}
+                          {item.status === 'NOT_IN_DRIVE' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800">
+                              Tidak Ada di Drive
+                            </span>
+                          )}
+                          {item.status === 'OUTDATED_SCRIPT' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                              Script v5 Perlu Deploy
+                            </span>
+                          )}
+                          {item.status === 'ERROR' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-800">
+                              Error Jaringan
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px] text-gray-600 leading-tight">
+                          {item.message}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          {item.status === 'RESTORED' && item.healedFileId && (
+                            <button
+                              type="button"
+                              disabled={isFixingReference}
+                              onClick={() =>
+                                handleFixReferences([
+                                  {
+                                    id: item.id,
+                                    drive_file_id: item.healedFileId,
+                                    drive_file_name: item.fileName,
+                                  },
+                                ])
+                              }
+                              className="px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded text-[10px] transition-colors cursor-pointer"
+                            >
+                              Perbaiki DB
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {photoCheckResults.length === 0 && !photoCheckProgress.isChecking && (
+                      <tr>
+                        <td colSpan={4} className="p-4 text-center text-gray-400 italic">
+                          Klik &quot;Cek Foto Cabang&quot; untuk memulai pemeriksaan konsistensi.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoCheckModalOpen(false)}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
