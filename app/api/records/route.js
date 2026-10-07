@@ -277,28 +277,38 @@ export async function POST(request) {
       );
     }
 
-    // Simpan data ke tabel absence_records
-    const { data: newRecord, error: insertError } = await supabase
+    // Simpan data ke tabel absence_records dengan penanda sumber_input = 'input_utama'
+    let insertPayload = {
+      nik,
+      nama_peserta,
+      jabatan,
+      training_id,
+      batch: parseInt(batch, 10),
+      tanggal_pelaksanaan,
+      branch_id,
+      alasan_id,
+      keterangan,
+      drive_file_id: driveFileData.drive_file_id,
+      drive_file_name: driveFileData.drive_file_name,
+      drive_file_url: driveFileData.drive_file_url,
+      file_mime_type: driveFileData.file_mime_type,
+      file_size_bytes: driveFileData.file_size_bytes,
+      created_by: session.userId,
+      sumber_input: 'input_utama',
+    };
+
+    let { data: newRecord, error: insertError } = await supabase
       .from('absence_records')
-      .insert({
-        nik,
-        nama_peserta,
-        jabatan,
-        training_id,
-        batch: parseInt(batch, 10),
-        tanggal_pelaksanaan,
-        branch_id,
-        alasan_id,
-        keterangan,
-        drive_file_id: driveFileData.drive_file_id,
-        drive_file_name: driveFileData.drive_file_name,
-        drive_file_url: driveFileData.drive_file_url,
-        file_mime_type: driveFileData.file_mime_type,
-        file_size_bytes: driveFileData.file_size_bytes,
-        created_by: session.userId,
-      })
+      .insert(insertPayload)
       .select()
       .single();
+
+    if (insertError && (insertError.message?.includes('sumber_input') || insertError.code === 'PGRST204')) {
+      delete insertPayload.sumber_input;
+      const retry = await supabase.from('absence_records').insert(insertPayload).select().single();
+      newRecord = retry.data;
+      insertError = retry.error;
+    }
 
     if (insertError) {
       console.error('[Record Insert Error]:', insertError);
