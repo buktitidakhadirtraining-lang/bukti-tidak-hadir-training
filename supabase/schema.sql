@@ -318,10 +318,12 @@ create table if not exists ttd_cabang (
   drive_file_id text not null,
   file_name text,
   mime_type text default 'image/png',
-  updated_by uuid references users(id) on delete set null,
+  updated_by uuid,
   updated_at timestamptz default now() not null,
   unique (cabang, peran)
 );
+
+alter table ttd_cabang drop constraint if exists ttd_cabang_updated_by_fkey;
 create index if not exists idx_ttd_cabang_lookup on ttd_cabang (cabang, peran);
 
 alter table cetak_rekap enable row level security;
@@ -330,7 +332,16 @@ alter table data_tambahan enable row level security;
 alter table cetak_list_tidak_hadir enable row level security;
 alter table ttd_cabang enable row level security;
 
-create policy "Allow all on ttd_cabang" on ttd_cabang for all using (true) with check (true);
+drop policy if exists "Select ttd_cabang per cabang" on ttd_cabang;
+drop policy if exists "Insert ttd_cabang per cabang" on ttd_cabang;
+drop policy if exists "Update ttd_cabang per cabang" on ttd_cabang;
+drop policy if exists "Delete ttd_cabang per cabang" on ttd_cabang;
+drop policy if exists "Allow all on ttd_cabang" on ttd_cabang;
+
+create policy "Select ttd_cabang per cabang" on ttd_cabang for select using (true);
+create policy "Insert ttd_cabang per cabang" on ttd_cabang for insert with check (true);
+create policy "Update ttd_cabang per cabang" on ttd_cabang for update using (true);
+create policy "Delete ttd_cabang per cabang" on ttd_cabang for delete using (true);
 
 -- ==============================================================================
 -- 16. RELOAD SCHEMA CACHE POSTGREST

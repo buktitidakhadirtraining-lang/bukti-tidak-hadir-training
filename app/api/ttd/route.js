@@ -9,6 +9,13 @@ export const runtime = 'nodejs';
 
 const VALID_PERAN = ['dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor'];
 
+// Cache in-memory untuk menyimpan data base64 gambar TTD per drive_file_id selama sesi server
+const ttdImageCache = new Map();
+
+const isValidUuid = (val) =>
+  typeof val === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
 /**
  * Helper: Mengambil data cabang yang valid untuk user session saat ini
  */
@@ -83,7 +90,7 @@ export async function GET(request) {
     let query = supabase
       .from('ttd_cabang')
       .select('id, cabang, peran, drive_file_id, file_name, mime_type, updated_at')
-      .eq('cabang', branch.name);
+      .ilike('cabang', branch.name.trim());
 
     const { data: ttdRecords, error: dbError } = await query;
 
@@ -95,23 +102,32 @@ export async function GET(request) {
         cabang: branch.name,
         branchCode: branch.code,
         isDriveReady,
-        warning: 'Tabel ttd_cabang belum dibuat di database Supabase.',
+        warning: `Tabel ttd_cabang error di Supabase: ${dbError.message}`,
       });
     }
 
-    // Ambil konten file dari Google Drive untuk setiap slot TTD yang ada
+    // Ambil konten file dari Google Drive untuk setiap slot TTD yang ada (menggunakan cache memori jika ada)
     const resultList = [];
     for (const rec of ttdRecords || []) {
       let dataUrl = null;
       if (isDriveReady && rec.drive_file_id) {
-        try {
-          const fileResult = await driveGetFile(branch, rec.drive_file_id);
-          if (fileResult?.base64) {
-            const mime = fileResult.mimeType || rec.mime_type || 'image/png';
-            dataUrl = `data:${mime};base64,${fileResult.base64}`;
+        if (ttdImageCache.has(rec.drive_file_id)) {
+          const cached = ttdImageCache.get(rec.drive_file_id);
+          dataUrl = `data:${cached.mimeType || 'image/png'};base64,${cached.base64}`;
+        } else {
+          try {
+            const fileResult = await driveGetFile(branch, rec.drive_file_id);
+            if (fileResult?.base64) {
+              const mime = fileResult.mimeType || rec.mime_type || 'image/png';
+              ttdImageCache.set(rec.drive_file_id, {
+                base64: fileResult.base64,
+                mimeType: mime,
+              });
+              dataUrl = `data:${mime};base64,${fileResult.base64}`;
+            }
+          } catch (fetchErr) {
+            console.warn(`[GET /api/ttd] Gagal mengambil file TTD ${rec.peran}:`, fetchErr.message);
           }
-        } catch (fetchErr) {
-          console.warn(`[GET /api/ttd] Gagal mengambil file TTD ${rec.peran}:`, fetchErr.message);
         }
       }
 
@@ -187,7 +203,8 @@ export async function POST(request) {
 
     // Format nama file: TTD_<KODE_CABANG>_<PERAN>_<timestamp>.png
     const branchCode = (branch.code || 'CAB').toUpperCase();
-    const peranUpper = peran.toUpperCase();
+    const cleanPeran = peran.trim().toLowerCase();
+    const peranUpper = cleanPeran.toUpperCase();
     const timestamp = Math.floor(Date.now() / 1000);
     const standardFileName = `TTD_${branchCode}_${peranUpper}_${timestamp}.png`;
 
@@ -195,8 +212,8 @@ export async function POST(request) {
     const { data: existingRecord } = await supabase
       .from('ttd_cabang')
       .select('id, drive_file_id')
-      .eq('cabang', branch.name)
-      .eq('peran', peran)
+      .ilike('cabang', branch.name.trim())
+      .eq('peran', cleanPeran)
       .maybeSingle();
 
     // 1. Upload file baru ke Google Drive cabang
@@ -222,23 +239,14 @@ export async function POST(request) {
       );
     }
 
-    // 2. Jika ada file lama, pindahkan ke tempat sampah (trash)
-    if (existingRecord?.drive_file_id && existingRecord.drive_file_id !== uploadResult.fileId) {
-      try {
-        await driveTrash(branch, existingRecord.drive_file_id);
-      } catch (trashErr) {
-        console.warn('[POST /api/ttd] Gagal memindahkan file lama ke sampah (diabaikan):', trashErr.message);
-      }
-    }
-
-    // 3. Simpan / Perbarui data di tabel ttd_cabang
+    // 2. Simpan / Perbarui data di tabel ttd_cabang
     const payload = {
-      cabang: branch.name,
-      peran,
+      cabang: branch.name.trim(),
+      peran: cleanPeran,
       drive_file_id: uploadResult.fileId,
       file_name: standardFileName,
       mime_type: mimeType || 'image/png',
-      updated_by: session.userId || null,
+      updated_by: isValidUuid(session.userId) ? session.userId : null,
       updated_at: new Date().toISOString(),
     };
 
@@ -250,17 +258,37 @@ export async function POST(request) {
 
     if (upsertError) {
       console.error('[POST /api/ttd] Upsert error:', upsertError.message);
-      // Fallback jika upsert gagal karena masalah unique constraint / schema
-      return NextResponse.json({
-        ok: true,
-        data: {
-          ...payload,
-          id: existingRecord?.id || 'temp-id',
+      // PENTING: Bersihkan file yang baru diupload ke Drive agar tidak menjadi file yatim/sampah di Drive
+      try {
+        await driveTrash(branch, uploadResult.fileId);
+      } catch (trashErr) {
+        console.warn('[POST /api/ttd] Gagal menghapus file baru setelah upsert error:', trashErr.message);
+      }
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Gagal menyimpan data TTD ke database Supabase: ${upsertError.message}. Pastikan script tabel 'ttd_cabang' sudah dijalankan di Supabase SQL Editor.`,
         },
-        dataUrl: `data:${mimeType};base64,${base64}`,
-        message: 'Tanda tangan berhasil diunggah ke Google Drive (peringatan: pastikan tabel ttd_cabang terpasang di database).',
-      });
+        { status: 500 }
+      );
     }
+
+    // 3. Setelah sukses tersimpan di database, barulah pindahkan file lama ke tempat sampah Drive jika ada
+    if (existingRecord?.drive_file_id && existingRecord.drive_file_id !== uploadResult.fileId) {
+      try {
+        ttdImageCache.delete(existingRecord.drive_file_id);
+        await driveTrash(branch, existingRecord.drive_file_id);
+      } catch (trashErr) {
+        console.warn('[POST /api/ttd] Gagal memindahkan file lama ke sampah (diabaikan):', trashErr.message);
+      }
+    }
+
+    // Simpan gambar baru ke cache server untuk request GET berikutnya
+    ttdImageCache.set(uploadResult.fileId, {
+      base64,
+      mimeType: mimeType || 'image/png',
+    });
 
     return NextResponse.json({
       ok: true,
@@ -309,20 +337,23 @@ export async function DELETE(request) {
       return NextResponse.json({ ok: false, error: 'Data cabang tidak ditemukan' }, { status: 404 });
     }
 
+    const cleanPeran = peran.trim().toLowerCase();
+
     // Cari file TTD yang ada
     const { data: existingRecord } = await supabase
       .from('ttd_cabang')
       .select('id, drive_file_id')
-      .eq('cabang', branch.name)
-      .eq('peran', peran)
+      .ilike('cabang', branch.name.trim())
+      .eq('peran', cleanPeran)
       .maybeSingle();
 
     if (!existingRecord) {
       return NextResponse.json({ ok: false, error: 'Data tanda tangan tidak ditemukan di sistem' }, { status: 404 });
     }
 
-    // 1. Pindahkan file ke sampah Google Drive
+    // 1. Pindahkan file ke sampah Google Drive & bersihkan cache
     if (branch.drive_bridge_url && branch.drive_bridge_secret_enc && existingRecord.drive_file_id) {
+      ttdImageCache.delete(existingRecord.drive_file_id);
       try {
         await driveTrash(branch, existingRecord.drive_file_id);
       } catch (trashErr) {
@@ -331,7 +362,13 @@ export async function DELETE(request) {
     }
 
     // 2. Hapus record dari Supabase
-    await supabase.from('ttd_cabang').delete().eq('id', existingRecord.id);
+    const { error: deleteError } = await supabase.from('ttd_cabang').delete().eq('id', existingRecord.id);
+    if (deleteError) {
+      return NextResponse.json(
+        { ok: false, error: `Gagal menghapus record tanda tangan dari database: ${deleteError.message}` },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,

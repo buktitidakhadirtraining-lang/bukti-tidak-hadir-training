@@ -2,11 +2,6 @@
 'use client';
 
 import React from 'react';
-import {
-  SignatureDbmAdmin,
-  SignatureHrdManager,
-  SignatureTcSupervisor,
-} from './BeritaAcaraRekap.js';
 
 export default function BeritaAcaraSoftSkill({
   data = [],
@@ -15,6 +10,7 @@ export default function BeritaAcaraSoftSkill({
   periode = 'September 2026',
   tanggalDibuat = '30 September 2026',
   inkColor = '#122b52',
+  ttdImages = {}, // { dbm_admin: dataUrl, hrd_manager: dataUrl, tc_supervisor: dataUrl }
 }) {
   return (
     <div
@@ -172,8 +168,18 @@ export default function BeritaAcaraSoftSkill({
           <div className="flex flex-col items-center">
             <p className="font-medium text-xs mb-0.5">Mengetahui 2,</p>
             <p className="font-bold text-xs mb-1">Deputy Branch Manager ADM</p>
-            <div className="h-20 flex items-center justify-center my-0.5">
-              {ttdMode === 'ada' ? <SignatureDbmAdmin inkColor={inkColor} /> : <div className="h-16 w-32" />}
+            <div className="h-16 flex items-center justify-center my-0.5 w-full">
+              {ttdMode === 'ada' && ttdImages?.dbm_admin ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={ttdImages.dbm_admin}
+                  alt="TTD DBM Admin"
+                  crossOrigin="anonymous"
+                  className="max-h-14 max-w-[120px] object-contain mx-auto"
+                />
+              ) : (
+                <div className="h-14 w-28" />
+              )}
             </div>
             <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
               RICKY MARIO
@@ -184,8 +190,18 @@ export default function BeritaAcaraSoftSkill({
           <div className="flex flex-col items-center">
             <p className="font-medium text-xs mb-0.5">Mengetahui 1,</p>
             <p className="font-bold text-xs mb-1">Human Resource Manager</p>
-            <div className="h-20 flex items-center justify-center my-0.5">
-              {ttdMode === 'ada' ? <SignatureHrdManager inkColor={inkColor} /> : <div className="h-16 w-32" />}
+            <div className="h-16 flex items-center justify-center my-0.5 w-full">
+              {ttdMode === 'ada' && ttdImages?.hrd_manager ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={ttdImages.hrd_manager}
+                  alt="TTD HRD Manager"
+                  crossOrigin="anonymous"
+                  className="max-h-14 max-w-[120px] object-contain mx-auto"
+                />
+              ) : (
+                <div className="h-14 w-28" />
+              )}
             </div>
             <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
               ABEDNEGO SETYA NUGROHO
@@ -196,8 +212,18 @@ export default function BeritaAcaraSoftSkill({
           <div className="flex flex-col items-center">
             <p className="font-medium text-xs mb-0.5">Membuat,</p>
             <p className="font-bold text-xs mb-1">Training Center Supervisor</p>
-            <div className="h-20 flex items-center justify-center my-0.5">
-              {ttdMode === 'ada' ? <SignatureTcSupervisor inkColor={inkColor} /> : <div className="h-16 w-32" />}
+            <div className="h-16 flex items-center justify-center my-0.5 w-full">
+              {ttdMode === 'ada' && ttdImages?.tc_supervisor ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={ttdImages.tc_supervisor}
+                  alt="TTD TC Supervisor"
+                  crossOrigin="anonymous"
+                  className="max-h-14 max-w-[120px] object-contain mx-auto"
+                />
+              ) : (
+                <div className="h-14 w-28" />
+              )}
             </div>
             <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
               ROKHMAN

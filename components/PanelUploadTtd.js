@@ -247,7 +247,7 @@ export default function PanelUploadTtd({
         isSaving: false,
       });
 
-      if (onTtdUpdated) onTtdUpdated();
+      if (onTtdUpdated) onTtdUpdated(json.data, json.dataUrl);
     } catch (err) {
       console.error('[Upload TTD Error]:', err);
       toast.error(err.message || 'Gagal menyimpan tanda tangan', { id: toastId });
@@ -283,7 +283,7 @@ export default function PanelUploadTtd({
       }
 
       toast.success(`Tanda tangan ${peranLabel} berhasil dihapus dari Google Drive!`, { id: toastId });
-      if (onTtdUpdated) onTtdUpdated();
+      if (onTtdUpdated) onTtdUpdated(null, null, peran);
     } catch (err) {
       console.error('[Delete TTD Error]:', err);
       toast.error(err.message || 'Gagal menghapus tanda tangan', { id: toastId });

@@ -28,6 +28,7 @@ import BeritaAcaraSoftSkill from '../../../components/BeritaAcaraSoftSkill.js';
 import LampiranListTidakHadir from '../../../components/LampiranListTidakHadir.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 import PanelUploadTtd from '../../../components/PanelUploadTtd.js';
+import ErrorBoundary from '../../../components/ErrorBoundary.js';
 
 // Komponen gambar bukti yang tajam dan aman
 function ProofImage({ recordId, src, alt, onLoaded, cols = 3 }) {
@@ -135,6 +136,31 @@ export default function CetakPage() {
       setIsTtdLoading(false);
     }
   }, [branchId]);
+
+  // Handler update TTD reaktif seketika di sisi klien
+  const handleTtdUpdated = useCallback(
+    (newRecord, dataUrl, deletedPeran) => {
+      if (newRecord && dataUrl) {
+        setTtdRecords((prev) => {
+          const filtered = prev.filter((r) => r.peran !== newRecord.peran);
+          return [...filtered, { ...newRecord, dataUrl }];
+        });
+        setTtdImages((prev) => ({
+          ...prev,
+          [newRecord.peran]: dataUrl,
+        }));
+      } else if (deletedPeran) {
+        setTtdRecords((prev) => prev.filter((r) => r.peran !== deletedPeran));
+        setTtdImages((prev) => {
+          const copy = { ...prev };
+          delete copy[deletedPeran];
+          return copy;
+        });
+      }
+      fetchTtdRecords();
+    },
+    [fetchTtdRecords]
+  );
 
   useEffect(() => {
     fetchTtdRecords();
@@ -571,8 +597,6 @@ export default function CetakPage() {
             fontSize: 9,
             fontStyle: 'bold',
             halign: 'center',
-            valign: 'bottom',
-            minCellHeight: 26,
             lineWidth: 0.2,
             lineColor: [0, 0, 0],
             cellPadding: 2,
@@ -582,6 +606,14 @@ export default function CetakPage() {
             textColor: [0, 0, 0],
             lineWidth: 0.2,
             lineColor: [0, 0, 0],
+            minCellHeight: 6,
+            cellPadding: 1.5,
+            valign: 'middle',
+          },
+          bodyStyles: {
+            minCellHeight: 22,
+            valign: 'bottom',
+            cellPadding: { top: 1, bottom: 2, left: 1, right: 1 },
           },
           columnStyles: {
             0: { cellWidth: 46.5 },
@@ -596,10 +628,10 @@ export default function CetakPage() {
               const imgData = ttdImages && ttdImages[roleKey];
               if (imgData) {
                 try {
-                  const imgW = 30;
-                  const imgH = 15;
+                  const imgW = 28;
+                  const imgH = 13;
                   const x = data.cell.x + (data.cell.width - imgW) / 2;
-                  const y = data.cell.y + 2;
+                  const y = data.cell.y + (data.cell.height - imgH - 5);
                   doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
                 } catch (imgErr) {
                   console.warn('Gagal menambahkan TTD ke PDF:', imgErr);
@@ -722,8 +754,6 @@ export default function CetakPage() {
             fontSize: 9,
             fontStyle: 'bold',
             halign: 'center',
-            valign: 'bottom',
-            minCellHeight: 22,
             lineWidth: 0.2,
             lineColor: [0, 0, 0],
             cellPadding: 2,
@@ -733,11 +763,37 @@ export default function CetakPage() {
             textColor: [0, 0, 0],
             lineWidth: 0.2,
             lineColor: [0, 0, 0],
+            minCellHeight: 10,
+            cellPadding: 1.5,
+            valign: 'middle',
+          },
+          bodyStyles: {
+            minCellHeight: 22,
+            valign: 'bottom',
+            cellPadding: { top: 1, bottom: 2, left: 1, right: 1 },
           },
           columnStyles: {
             0: { cellWidth: 62 },
             1: { cellWidth: 62 },
             2: { cellWidth: 62 },
+          },
+          didDrawCell: function (data) {
+            if (softSkillTtdMode === 'ada' && data.section === 'body' && data.row.index === 0) {
+              const roles = ['dbm_admin', 'hrd_manager', 'tc_supervisor'];
+              const roleKey = roles[data.column.index];
+              const imgData = ttdImages && ttdImages[roleKey];
+              if (imgData) {
+                try {
+                  const imgW = 28;
+                  const imgH = 13;
+                  const x = data.cell.x + (data.cell.width - imgW) / 2;
+                  const y = data.cell.y + (data.cell.height - imgH - 5);
+                  doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
+                } catch (imgErr) {
+                  console.warn('Gagal menambahkan TTD Soft Skill ke PDF:', imgErr);
+                }
+              }
+            }
           },
         });
 
@@ -1407,8 +1463,8 @@ export default function CetakPage() {
         )}
       </div>
 
-      {/* Panel Upload Tanda Tangan Cabang (Hanya saat Berita Acara Rekap dipilih) */}
-      {printFormat === 'rekap_dispensasi' && (
+      {/* Panel Upload Tanda Tangan Cabang (Tampil saat Berita Acara Rekap atau Soft Skill dipilih) */}
+      {(printFormat === 'rekap_dispensasi' || printFormat === 'soft_skill') && (
         <div className="no-print">
           <PanelUploadTtd
             ttdRecords={ttdRecords}
@@ -1416,7 +1472,7 @@ export default function CetakPage() {
             branchName={selectedBranchObj?.name || meta?.userBranchName || ''}
             branchId={branchId}
             isDriveReady={Boolean(selectedBranchObj?.driveReady ?? meta?.userBranchDriveReady ?? true)}
-            onTtdUpdated={fetchTtdRecords}
+            onTtdUpdated={handleTtdUpdated}
           />
         </div>
       )}
@@ -1425,34 +1481,39 @@ export default function CetakPage() {
       {/* 1. FORMAT: BERITA ACARA REKAPITULASI (GAMBAR 2 & GAMBAR 3)                 */}
       {/* ========================================================================= */}
       {printFormat === 'rekap_dispensasi' && (
-        <div id="printable-content" className="max-w-4xl mx-auto">
-          <BeritaAcaraRekap
-            data={rekapData}
-            ttdMode={ttdMode}
-            inkColor={inkColor}
-            tanggalCetak={tanggalCetak}
-            cabang={cabangCetak}
-            bulan={bulanCetak}
-            tahun={tahunCetak}
-            ttdImages={ttdImages}
-          />
-        </div>
+        <ErrorBoundary componentName="Berita Acara Rekapitulasi">
+          <div id="printable-content" className="max-w-4xl mx-auto">
+            <BeritaAcaraRekap
+              data={rekapData}
+              ttdMode={ttdMode}
+              inkColor={inkColor}
+              tanggalCetak={tanggalCetak}
+              cabang={cabangCetak}
+              bulan={bulanCetak}
+              tahun={tahunCetak}
+              ttdImages={ttdImages}
+            />
+          </div>
+        </ErrorBoundary>
       )}
 
       {/* ========================================================================= */}
       {/* 2. FORMAT: BERITA ACARA SOFT SKILL (GAMBAR 6 & GAMBAR 7)                   */}
       {/* ========================================================================= */}
       {printFormat === 'soft_skill' && (
-        <div id="printable-content" className="max-w-4xl mx-auto">
-          <BeritaAcaraSoftSkill
-            data={softSkillData}
-            ttdMode={softSkillTtdMode}
-            inkColor={inkColor}
-            cabang={softSkillCabang}
-            periode={softSkillPeriode}
-            tanggalDibuat={softSkillTanggalDibuat}
-          />
-        </div>
+        <ErrorBoundary componentName="Berita Acara Soft Skill">
+          <div id="printable-content" className="max-w-4xl mx-auto">
+            <BeritaAcaraSoftSkill
+              data={softSkillData}
+              ttdMode={softSkillTtdMode}
+              inkColor={inkColor}
+              cabang={softSkillCabang}
+              periode={softSkillPeriode}
+              tanggalDibuat={softSkillTanggalDibuat}
+              ttdImages={ttdImages}
+            />
+          </div>
+        </ErrorBoundary>
       )}
 
       {/* ========================================================================= */}

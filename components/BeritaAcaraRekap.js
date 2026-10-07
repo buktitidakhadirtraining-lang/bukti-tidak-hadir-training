@@ -203,23 +203,22 @@ export default function BeritaAcaraRekap({
             <tr>
               {/* Kolom 1: DBM Operasional */}
               <td
-                className="p-1.5 align-bottom"
-                style={{ border: '0.75px solid #000000', height: '85px', width: '25%' }}
+                className="p-1 align-bottom"
+                style={{ border: '0.75px solid #000000', width: '25%' }}
               >
-                {ttdMode === 'ada' && ttdImages?.dbm_operasional ? (
-                  <div className="flex items-center justify-center mb-1 w-full" style={{ height: '20mm' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div className="h-16 flex items-center justify-center mb-1 w-full">
+                  {ttdMode === 'ada' && ttdImages?.dbm_operasional ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={ttdImages.dbm_operasional}
                       alt="TTD DBM Operasional"
                       crossOrigin="anonymous"
-                      className="max-h-[19mm] max-w-full object-contain mx-auto"
-                      style={{ objectFit: 'contain' }}
+                      className="max-h-14 max-w-full object-contain mx-auto"
                     />
-                  </div>
-                ) : (
-                  <div style={{ height: '20mm' }} />
-                )}
+                  ) : (
+                    <div className="h-14" />
+                  )}
+                </div>
                 <div className="border-t border-black pt-1 mx-2">
                   <span className="font-bold block text-center">DBM Operasional</span>
                 </div>
@@ -227,23 +226,22 @@ export default function BeritaAcaraRekap({
 
               {/* Kolom 2: DBM Admin */}
               <td
-                className="p-1.5 align-bottom"
-                style={{ border: '0.75px solid #000000', height: '85px', width: '25%' }}
+                className="p-1 align-bottom"
+                style={{ border: '0.75px solid #000000', width: '25%' }}
               >
-                {ttdMode === 'ada' && ttdImages?.dbm_admin ? (
-                  <div className="flex items-center justify-center mb-1 w-full" style={{ height: '20mm' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div className="h-16 flex items-center justify-center mb-1 w-full">
+                  {ttdMode === 'ada' && ttdImages?.dbm_admin ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={ttdImages.dbm_admin}
                       alt="TTD DBM Admin"
                       crossOrigin="anonymous"
-                      className="max-h-[19mm] max-w-full object-contain mx-auto"
-                      style={{ objectFit: 'contain' }}
+                      className="max-h-14 max-w-full object-contain mx-auto"
                     />
-                  </div>
-                ) : (
-                  <div style={{ height: '20mm' }} />
-                )}
+                  ) : (
+                    <div className="h-14" />
+                  )}
+                </div>
                 <div className="border-t border-black pt-1 mx-2">
                   <span className="font-bold block text-center">DBM Admin</span>
                 </div>
@@ -251,23 +249,22 @@ export default function BeritaAcaraRekap({
 
               {/* Kolom 3: HRD Manager */}
               <td
-                className="p-1.5 align-bottom"
-                style={{ border: '0.75px solid #000000', height: '85px', width: '25%' }}
+                className="p-1 align-bottom"
+                style={{ border: '0.75px solid #000000', width: '25%' }}
               >
-                {ttdMode === 'ada' && ttdImages?.hrd_manager ? (
-                  <div className="flex items-center justify-center mb-1 w-full" style={{ height: '20mm' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div className="h-16 flex items-center justify-center mb-1 w-full">
+                  {ttdMode === 'ada' && ttdImages?.hrd_manager ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={ttdImages.hrd_manager}
                       alt="TTD HRD Manager"
                       crossOrigin="anonymous"
-                      className="max-h-[19mm] max-w-full object-contain mx-auto"
-                      style={{ objectFit: 'contain' }}
+                      className="max-h-14 max-w-full object-contain mx-auto"
                     />
-                  </div>
-                ) : (
-                  <div style={{ height: '20mm' }} />
-                )}
+                  ) : (
+                    <div className="h-14" />
+                  )}
+                </div>
                 <div className="border-t border-black pt-1 mx-2">
                   <span className="font-bold block text-center">HRD Manager</span>
                 </div>
@@ -275,23 +272,22 @@ export default function BeritaAcaraRekap({
 
               {/* Kolom 4: TC Supervisor */}
               <td
-                className="p-1.5 align-bottom"
-                style={{ border: '0.75px solid #000000', height: '85px', width: '25%' }}
+                className="p-1 align-bottom"
+                style={{ border: '0.75px solid #000000', width: '25%' }}
               >
-                {ttdMode === 'ada' && ttdImages?.tc_supervisor ? (
-                  <div className="flex items-center justify-center mb-1 w-full" style={{ height: '20mm' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div className="h-16 flex items-center justify-center mb-1 w-full">
+                  {ttdMode === 'ada' && ttdImages?.tc_supervisor ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={ttdImages.tc_supervisor}
                       alt="TTD TC Supervisor"
                       crossOrigin="anonymous"
-                      className="max-h-[19mm] max-w-full object-contain mx-auto"
-                      style={{ objectFit: 'contain' }}
+                      className="max-h-14 max-w-full object-contain mx-auto"
                     />
-                  </div>
-                ) : (
-                  <div style={{ height: '20mm' }} />
-                )}
+                  ) : (
+                    <div className="h-14" />
+                  )}
+                </div>
                 <div className="border-t border-black pt-1 mx-2">
                   <span className="font-bold block text-center">TC Supervisor</span>
                 </div>

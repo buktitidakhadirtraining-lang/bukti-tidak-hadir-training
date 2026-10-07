@@ -124,10 +124,13 @@ CREATE TABLE IF NOT EXISTS public.ttd_cabang (
     drive_file_id TEXT NOT NULL,
     file_name TEXT,
     mime_type TEXT DEFAULT 'image/png',
-    updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
+    updated_by UUID,
     updated_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE (cabang, peran)
 );
+
+-- Hapus constraint foreign key kaku ke auth.users jika tabel sudah pernah dibuat sebelumnya
+ALTER TABLE public.ttd_cabang DROP CONSTRAINT IF EXISTS ttd_cabang_updated_by_fkey;
 
 CREATE INDEX IF NOT EXISTS idx_ttd_cabang_lookup ON public.ttd_cabang (cabang, peran);
 ALTER TABLE public.ttd_cabang ENABLE ROW LEVEL SECURITY;
