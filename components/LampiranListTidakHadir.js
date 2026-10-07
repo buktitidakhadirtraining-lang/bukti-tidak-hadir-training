@@ -3,8 +3,8 @@
 
 import React, { useMemo } from 'react';
 
-// Chunk array helper function (chunk size 40)
-function chunkArray(arr, size = 40) {
+// Chunk array helper function (maksimal 20 baris per halaman)
+function chunkArray(arr, size = 20) {
   if (!arr || arr.length === 0) return [];
   const chunks = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -61,7 +61,7 @@ export default function LampiranListTidakHadir({
     );
   }, [groupedData, selectedTraining]);
 
-  // 3. Pagination & Chunking (maksimal 40 baris per lembar A4, 1 jenis training per lembar)
+  // 3. Pagination & Chunking (Maksimal 20 baris per lembar A4, setiap jenis training selalu di halaman baru)
   const sheets = useMemo(() => {
     if (filteredGroups.length === 0) {
       return [
@@ -81,7 +81,7 @@ export default function LampiranListTidakHadir({
     let currentPageCounter = 0;
 
     for (const group of filteredGroups) {
-      const chunks = chunkArray(group.items, 40);
+      const chunks = chunkArray(group.items, 20);
 
       if (chunks.length === 0) {
         currentPageCounter++;
@@ -101,7 +101,7 @@ export default function LampiranListTidakHadir({
             sheetId: `${group.training}-p${chunkIdx + 1}`,
             training: group.training,
             items: chunk,
-            startIndex: chunkIdx * 40,
+            startIndex: chunkIdx * 20,
             pageNumber: currentPageCounter,
             totalItemsInGroup: group.items.length,
             isEmpty: false,
@@ -122,10 +122,8 @@ export default function LampiranListTidakHadir({
     >
       {sheets.map((sheet, sheetIdx) => {
         const isLastSheet = sheetIdx === totalSheetsCount - 1;
-        const itemCount = sheet.items ? sheet.items.length : 0;
-        // Pengecekan ukuran font dan padding: jika > 30 baris, gunakan 8.5pt dan 1.2mm
-        const cellFontSize = itemCount > 30 ? '8.5pt' : '9pt';
-        const cellPadding = itemCount > 30 ? '1.2mm 2mm' : '1.6mm 2mm';
+        const cellFontSize = '9pt';
+        const cellPadding = '1.6mm 2mm';
 
         return (
           <div
@@ -133,7 +131,7 @@ export default function LampiranListTidakHadir({
             className={`sheet ${isLastSheet ? 'last-sheet' : ''}`}
             style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
           >
-            {/* Header Lembar A4 */}
+            {/* Header Lembar A4 (Selalu diulang di setiap halaman) */}
             <div className="sheet-header text-center" style={{ marginBottom: '0' }}>
               <h1
                 style={{
@@ -159,7 +157,7 @@ export default function LampiranListTidakHadir({
                   textTransform: 'uppercase',
                   color: '#000000',
                   marginTop: '2mm',
-                  marginBottom: '6mm',
+                  marginBottom: '5mm',
                   padding: 0,
                   lineHeight: '1.2',
                 }}
@@ -168,7 +166,7 @@ export default function LampiranListTidakHadir({
               </h2>
             </div>
 
-            {/* Tabel / Konten Lembar */}
+            {/* Tabel Konten Lembar (Maksimal 20 baris per lembar) */}
             <div className="sheet-body w-full">
               {sheet.isEmpty ? (
                 <div
@@ -297,13 +295,16 @@ export default function LampiranListTidakHadir({
                     {sheet.items.map((row, rIdx) => {
                       const rowNumber = sheet.startIndex + rIdx + 1;
                       return (
-                        <tr key={row.id || `${row.nik}-${rIdx}`}>
+                        <tr
+                          key={row.id || `${row.nik}-${rIdx}`}
+                          style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
+                        >
                           <td
                             style={{
                               border: '0.75px solid #000000',
                               padding: cellPadding,
                               fontSize: cellFontSize,
-                              lineHeight: '1.3',
+                              lineHeight: '1.25',
                               textAlign: 'center',
                               verticalAlign: 'middle',
                               whiteSpace: 'nowrap',
@@ -317,7 +318,7 @@ export default function LampiranListTidakHadir({
                               border: '0.75px solid #000000',
                               padding: cellPadding,
                               fontSize: cellFontSize,
-                              lineHeight: '1.3',
+                              lineHeight: '1.25',
                               textAlign: 'center',
                               verticalAlign: 'middle',
                               textTransform: 'uppercase',
@@ -333,7 +334,7 @@ export default function LampiranListTidakHadir({
                               border: '0.75px solid #000000',
                               padding: cellPadding,
                               fontSize: cellFontSize,
-                              lineHeight: '1.3',
+                              lineHeight: '1.25',
                               textAlign: 'center',
                               verticalAlign: 'middle',
                               whiteSpace: 'nowrap',
@@ -348,7 +349,7 @@ export default function LampiranListTidakHadir({
                               border: '0.75px solid #000000',
                               padding: cellPadding,
                               fontSize: cellFontSize,
-                              lineHeight: '1.3',
+                              lineHeight: '1.25',
                               textAlign: 'left',
                               verticalAlign: 'middle',
                               textTransform: 'uppercase',
@@ -364,7 +365,7 @@ export default function LampiranListTidakHadir({
                               border: '0.75px solid #000000',
                               padding: cellPadding,
                               fontSize: cellFontSize,
-                              lineHeight: '1.3',
+                              lineHeight: '1.25',
                               textAlign: 'center',
                               verticalAlign: 'middle',
                               whiteSpace: 'nowrap',
@@ -379,7 +380,7 @@ export default function LampiranListTidakHadir({
                               border: '0.75px solid #000000',
                               padding: cellPadding,
                               fontSize: cellFontSize,
-                              lineHeight: '1.3',
+                              lineHeight: '1.25',
                               textAlign: 'left',
                               verticalAlign: 'middle',
                               textTransform: 'uppercase',
@@ -395,7 +396,7 @@ export default function LampiranListTidakHadir({
                               border: '0.75px solid #000000',
                               padding: cellPadding,
                               fontSize: cellFontSize,
-                              lineHeight: '1.3',
+                              lineHeight: '1.25',
                               textAlign: 'left',
                               verticalAlign: 'middle',
                               textTransform: 'uppercase',
@@ -430,7 +431,7 @@ export default function LampiranListTidakHadir({
                 Dokumen Rekapitulasi Ketidakhadiran Peserta Training &bull; Jenis Training: {sheet.training} ({sheet.totalItemsInGroup} Peserta)
               </span>
               <span style={{ color: '#000000', fontWeight: 'bold' }}>
-                Halaman {sheet.pageNumber}
+                Halaman {sheet.pageNumber} dari {totalSheetsCount}
               </span>
             </div>
           </div>

@@ -452,6 +452,15 @@ export default function CetakPage() {
           return;
         }
 
+        let totalExpectedPages = 0;
+        const chunkSize = 20;
+        for (let gIdx = 0; gIdx < filteredKeys.length; gIdx++) {
+          const groupKey = filteredKeys[gIdx];
+          const groupItems = groups[groupKey];
+          const chunkCount = Math.ceil(groupItems.length / chunkSize) || 1;
+          totalExpectedPages += chunkCount;
+        }
+
         let totalPageCounter = 0;
 
         for (let gIdx = 0; gIdx < filteredKeys.length; gIdx++) {
@@ -459,7 +468,6 @@ export default function CetakPage() {
           const groupItems = groups[groupKey];
           const totalGroupItems = groupItems.length;
 
-          const chunkSize = 40;
           const chunkCount = Math.ceil(groupItems.length / chunkSize) || 1;
 
           for (let cIdx = 0; cIdx < chunkCount; cIdx++) {
@@ -494,7 +502,7 @@ export default function CetakPage() {
                 textColor: [0, 0, 0],
                 cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
                 valign: 'middle',
-                minCellHeight: 7,
+                minCellHeight: 6.5,
                 overflow: 'linebreak',
                 lineWidth: 0.2,
                 lineColor: [0, 0, 0],
@@ -518,7 +526,7 @@ export default function CetakPage() {
                 6: { halign: 'left', cellWidth: 26 },
               },
               didDrawPage: function () {
-                // Judul & Subjudul Utama
+                // Judul & Subjudul Utama (Diulang di tiap lembar)
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(15);
                 doc.setTextColor(0, 0, 0);
@@ -527,7 +535,7 @@ export default function CetakPage() {
                 doc.setFontSize(12);
                 doc.text(`JENIS TRAINING: ${groupKey}`, 105, 25, { align: 'center' });
 
-                // Footer
+                // Footer Lembar
                 const pageY = 284;
                 doc.setLineWidth(0.2);
                 doc.setDrawColor(0, 0, 0);
@@ -545,7 +553,7 @@ export default function CetakPage() {
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(0, 0, 0);
                 const currentPage = doc.internal.getNumberOfPages();
-                doc.text(`Halaman ${currentPage}`, 198, pageY + 2, { align: 'right' });
+                doc.text(`Halaman ${currentPage} dari ${totalExpectedPages}`, 198, pageY + 2, { align: 'right' });
               },
             });
           }
