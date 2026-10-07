@@ -29,7 +29,8 @@ import LampiranListTidakHadir from '../../../components/LampiranListTidakHadir.j
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 
 // Komponen gambar bukti yang tajam dan aman
-function ProofImage({ recordId, src, alt, onLoaded, isSingleRow = false }) {
+function ProofImage({ recordId, src, alt, onLoaded, cols = 3 }) {
+  const maxHeight = cols === 3 ? '55mm' : '43mm';
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -38,7 +39,7 @@ function ProofImage({ recordId, src, alt, onLoaded, isSingleRow = false }) {
       crossOrigin="anonymous"
       className="max-h-full max-w-full w-auto h-auto object-contain mx-auto"
       style={{
-        maxHeight: isSingleRow ? '118mm' : '52mm',
+        maxHeight: maxHeight,
         maxWidth: '100%',
         objectFit: 'contain',
         imageRendering: 'auto',
@@ -103,6 +104,7 @@ export default function CetakPage() {
 
   // Tracking loaded images for Format Horizontal
   const [loadedImageIds, setLoadedImageIds] = useState(new Set());
+  const [horizontalCols, setHorizontalCols] = useState(3); // 3 (default - foto lebih besar) | 4 kolom
 
   // 1. Muat Meta
   useEffect(() => {
@@ -971,7 +973,7 @@ export default function CetakPage() {
                 }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Bukti Foto Horizontal (4 Kolom)</span>
+                <span>Bukti Foto Horizontal ({horizontalCols} Kolom)</span>
               </button>
 
               {/* 5. Grid Vertikal Lama */}
@@ -1221,91 +1223,133 @@ export default function CetakPage() {
 
         {/* C. Pengaturan Format Bukti Foto (Horizontal / Lama) */}
         {(printFormat === 'horizontal' || printFormat === 'lama') && (
-          <div className="pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-            {meta?.userRole === 'admin_pusat' && (
+          <div className="pt-3 border-t border-gray-100 space-y-3">
+            {printFormat === 'horizontal' && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-[#0056b3]" />
+                  <span className="font-bold text-gray-800">Jumlah Foto Per Baris:</span>
+                  <div className="inline-flex p-1 bg-white rounded-lg border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setHorizontalCols(3)}
+                      className={`px-3 py-1 font-bold rounded text-xs transition-colors ${
+                        horizontalCols === 3
+                          ? 'bg-[#0056b3] text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      3 Kolom (Default - Lebih Besar)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHorizontalCols(4)}
+                      className={`px-3 py-1 font-bold rounded text-xs transition-colors ${
+                        horizontalCols === 4
+                          ? 'bg-[#0056b3] text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      4 Kolom
+                    </button>
+                  </div>
+                </div>
+                <div className="text-gray-500 text-[11px]">
+                  💡 <em>{horizontalCols === 3 ? '3 Kolom: Foto lebih besar & teks di foto lebih terbaca (maks 6 peserta/halaman).' : '4 Kolom: Tampilan kompak (maks 8 peserta/halaman).'}</em>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+              {meta?.userRole === 'admin_pusat' && (
+                <div>
+                  <label className="block font-bold text-gray-600 mb-1">Cabang</label>
+                  <select
+                    value={branchId}
+                    onChange={(e) => setBranchId(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+                  >
+                    <option value="">Semua Cabang</option>
+                    {meta?.branches?.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
-                <label className="block font-bold text-gray-600 mb-1">Cabang</label>
+                <label className="block font-bold text-gray-600 mb-1">Jenis Training</label>
                 <select
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
+                  value={trainingId}
+                  onChange={(e) => setTrainingId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
                 >
-                  <option value="">Semua Cabang</option>
-                  {meta?.branches?.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
+                  <option value="">Semua Training</option>
+                  {meta?.trainings?.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
                     </option>
                   ))}
                 </select>
               </div>
-            )}
 
-            <div>
-              <label className="block font-bold text-gray-600 mb-1">Jenis Training</label>
-              <select
-                value={trainingId}
-                onChange={(e) => setTrainingId(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-              >
-                <option value="">Semua Training</option>
-                {meta?.trainings?.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block font-bold text-gray-600 mb-1">Bulan</label>
+                <select
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+                >
+                  <option value="">Semua Bulan</option>
+                  {meta?.months?.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block font-bold text-gray-600 mb-1">Bulan</label>
-              <select
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-              >
-                <option value="">Semua Bulan</option>
-                {meta?.months?.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block font-bold text-gray-600 mb-1">Tahun</label>
+                <select
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+                >
+                  <option value="">Semua Tahun</option>
+                  {meta?.years?.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block font-bold text-gray-600 mb-1">Tahun</label>
-              <select
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-              >
-                <option value="">Semua Tahun</option>
-                {meta?.years?.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {printFormat === 'lama' && (
+                <>
+                  <div>
+                    <label className="block font-bold text-gray-600 mb-1">Nama Trainer</label>
+                    <input
+                      type="text"
+                      value={trainerName}
+                      onChange={(e) => setTrainerName(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+                    />
+                  </div>
 
-            <div>
-              <label className="block font-bold text-gray-600 mb-1">Nama Trainer</label>
-              <input
-                type="text"
-                value={trainerName}
-                onChange={(e) => setTrainerName(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-gray-600 mb-1">Pimpinan / Manager</label>
-              <input
-                type="text"
-                value={managerName}
-                onChange={(e) => setManagerName(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-              />
+                  <div>
+                    <label className="block font-bold text-gray-600 mb-1">Pimpinan / Manager</label>
+                    <input
+                      type="text"
+                      value={managerName}
+                      onChange={(e) => setManagerName(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1357,8 +1401,7 @@ export default function CetakPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 4. FORMAT: GRID HORIZONTAL 4 KOLOM BUKTI FOTO                             */}
-      {/* ========================================================================= */}
+      {/* 4. FORMAT: GRID HORIZONTAL BUKTI FOTO */}
       {printFormat === 'horizontal' && (
         <div id="printable-content" className="space-y-8 print:space-y-0">
           <style jsx global>{`
@@ -1369,14 +1412,23 @@ export default function CetakPage() {
           `}</style>
           {trainingGroups.length > 0 ? (
             trainingGroups.flatMap((group, groupIdx) => {
-              // Bagi records per grup menjadi per lembar/halaman (maksimal 8 peserta per lembar: 2 baris x 4 kolom)
-              const pages = chunkArray(group.records, 8);
+              // Paginasi: 2 baris penuh per halaman A4 landscape
+              // Jika 3 kolom: 6 peserta per halaman (3 kolom x 2 baris)
+              // Jika 4 kolom: 8 peserta per halaman (4 kolom x 2 baris)
+              const itemsPerPage = horizontalCols * 2;
+              const pages = chunkArray(group.records, itemsPerPage);
               const totalPages = pages.length;
 
               return pages.map((pageRecords, pageIdx) => {
-                // Bagi records lembar ini menjadi baris-baris (maksimal 4 peserta per baris)
-                const rows = chunkArray(pageRecords, 4);
-                const isSingleRow = rows.length === 1;
+                // Bagi records lembar ini menjadi per baris
+                const rows = chunkArray(pageRecords, horizontalCols);
+                const colWidthPercent = `${(100 / horizontalCols).toFixed(3)}%`;
+
+                // Tinggi area foto disesuaikan dengan rasio landscape 4:3 / 16:9 pada lebar sel
+                // 3 kolom (lebar sel ~91mm) -> tinggi area foto ~60mm (container ~57mm, max image 55mm)
+                // 4 kolom (lebar sel ~68mm) -> tinggi area foto ~48mm (container ~45mm, max image 43mm)
+                const cellPhotoHeight = horizontalCols === 3 ? '60mm' : '48mm';
+                const innerContainerHeight = horizontalCols === 3 ? '57mm' : '45mm';
 
                 return (
                   <div
@@ -1390,26 +1442,25 @@ export default function CetakPage() {
                         className="w-full text-left text-xs table-fixed"
                         style={{
                           borderCollapse: 'collapse',
-                          border: '1px solid #000000',
+                          border: '1.5px solid #000000',
                           tableLayout: 'fixed',
                           width: '100%',
                         }}
                       >
                         <colgroup>
-                          <col style={{ width: '25%' }} />
-                          <col style={{ width: '25%' }} />
-                          <col style={{ width: '25%' }} />
-                          <col style={{ width: '25%' }} />
+                          {Array.from({ length: horizontalCols }).map((_, i) => (
+                            <col key={i} style={{ width: colWidthPercent }} />
+                          ))}
                         </colgroup>
                         <thead>
                           <tr>
                             <th
-                              colSpan={4}
-                              className="text-center font-black uppercase text-sm sm:text-base font-title tracking-wider text-black py-2.5 px-3"
+                              colSpan={horizontalCols}
+                              className="text-center font-black uppercase text-sm sm:text-base font-title tracking-wider text-black py-2 px-3"
                               style={{
                                 border: '1px solid #000000',
                                 backgroundColor: '#F3F4F6',
-                                minHeight: '10mm',
+                                minHeight: '8.5mm',
                               }}
                             >
                               LAMPIRAN BUKTI TIDAK HADIR
@@ -1417,27 +1468,28 @@ export default function CetakPage() {
                           </tr>
                           <tr>
                             <th
-                              colSpan={4}
-                              className="text-center font-bold uppercase text-xs sm:text-sm font-title tracking-wide text-black py-2 px-3"
+                              colSpan={horizontalCols}
+                              className="text-center font-bold uppercase text-xs sm:text-sm font-title tracking-wide text-black py-1.5 px-3"
                               style={{
                                 border: '1px solid #000000',
                                 backgroundColor: '#F9FAFB',
+                                minHeight: '7mm',
                               }}
                             >
-                              {group.name} {totalPages > 1 ? `(Lembar ${pageIdx + 1} dari ${totalPages})` : ''}
+                              {group.name} (Halaman {pageIdx + 1} dari {totalPages})
                             </th>
                           </tr>
                         </thead>
                         <tbody>
                           {rows.map((rowChunk, rowIdx) => {
                             const padded = [...rowChunk];
-                            while (padded.length < 4) {
+                            while (padded.length < horizontalCols) {
                               padded.push(null);
                             }
 
                             return (
                               <React.Fragment key={`row-${pageIdx}-${rowIdx}`}>
-                                {/* Baris 1: NIK & Nama Peserta (2 baris teks, padding minimal 2mm, tinggi otomatis menyesuaikan teks) */}
+                                {/* Baris 1: NIK & Nama Peserta (2 baris teks, padding minimal 2mm, tidak terpotong) */}
                                 <tr className="print-break-avoid" style={{ backgroundColor: '#ffffff' }}>
                                   {padded.map((item, colIdx) => (
                                     <td
@@ -1445,29 +1497,29 @@ export default function CetakPage() {
                                       className="text-center align-middle"
                                       style={{
                                         border: '1px solid #000000',
-                                        width: '25%',
-                                        padding: '6px 8px',
+                                        width: colWidthPercent,
+                                        padding: '5px 6px',
                                         backgroundColor: '#ffffff',
                                         verticalAlign: 'middle',
                                       }}
                                     >
                                       {item ? (
-                                        <div className="flex flex-col items-center justify-center min-h-[38px]">
+                                        <div className="flex flex-col items-center justify-center min-h-[36px]">
                                           <span className="font-mono font-bold text-[11px] sm:text-xs text-black tracking-wide leading-tight">
                                             {item.nik || '-'}
                                           </span>
-                                          <span className="font-bold text-[11px] sm:text-xs text-gray-900 mt-1 leading-snug break-words max-w-full text-center">
+                                          <span className="font-bold text-[11px] sm:text-xs text-gray-900 mt-0.5 leading-snug break-words max-w-full text-center">
                                             {item.nama_peserta || '-'}
                                           </span>
                                         </div>
                                       ) : (
-                                        <div className="min-h-[38px]">&nbsp;</div>
+                                        <div className="min-h-[36px]">&nbsp;</div>
                                       )}
                                     </td>
                                   ))}
                                 </tr>
 
-                                {/* Baris 2: Foto Bukti Pelatihan (Contain, Aspect Ratio terjaga, tinggi proporsional seragam) */}
+                                {/* Baris 2: Foto Bukti Pelatihan (Contain, rasio landscape 4:3 / 16:9 pas tanpa ruang putih berlebih) */}
                                 <tr className="print-break-avoid" style={{ backgroundColor: '#fafafa' }}>
                                   {padded.map((item, colIdx) => (
                                     <td
@@ -1475,11 +1527,11 @@ export default function CetakPage() {
                                       className="text-center align-middle"
                                       style={{
                                         border: '1px solid #000000',
-                                        width: '25%',
-                                        height: isSingleRow ? '125mm' : '58mm',
-                                        minHeight: isSingleRow ? '125mm' : '58mm',
-                                        maxHeight: isSingleRow ? '125mm' : '58mm',
-                                        padding: '4px',
+                                        width: colWidthPercent,
+                                        height: cellPhotoHeight,
+                                        minHeight: cellPhotoHeight,
+                                        maxHeight: cellPhotoHeight,
+                                        padding: '3px',
                                         backgroundColor: '#fafafa',
                                         verticalAlign: 'middle',
                                       }}
@@ -1487,9 +1539,9 @@ export default function CetakPage() {
                                       <div
                                         className="w-full h-full flex items-center justify-center overflow-hidden rounded bg-white"
                                         style={{
-                                          height: isSingleRow ? '122mm' : '55mm',
-                                          maxHeight: isSingleRow ? '122mm' : '55mm',
-                                          padding: '3px',
+                                          height: innerContainerHeight,
+                                          maxHeight: innerContainerHeight,
+                                          padding: '2px',
                                         }}
                                       >
                                         {!item ? (
@@ -1513,7 +1565,7 @@ export default function CetakPage() {
                                             src={`/api/records/${item.id}/file`}
                                             alt={`Bukti ${item.nama_peserta}`}
                                             onLoaded={handleImageLoaded}
-                                            isSingleRow={isSingleRow}
+                                            cols={horizontalCols}
                                           />
                                         )}
                                       </div>
