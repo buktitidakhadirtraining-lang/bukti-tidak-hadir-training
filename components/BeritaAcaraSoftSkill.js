@@ -165,66 +165,124 @@ export default function BeritaAcaraSoftSkill({
       <div className="overflow-x-auto print-break-avoid pt-2" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
         <div className="grid grid-cols-3 gap-4 text-center">
           {/* Kolom 1: Mengetahui 2, Deputy Branch Manager ADM - RICKY MARIO */}
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center relative" style={{ overflow: 'visible' }}>
             <p className="font-medium text-xs mb-0.5">Mengetahui 2,</p>
             <p className="font-bold text-xs mb-1">Deputy Branch Manager ADM</p>
-            <div className="h-16 flex items-center justify-center my-0.5 w-full">
-              {ttdMode === 'ada' && ttdImages?.dbm_admin ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={ttdImages.dbm_admin}
-                  alt="TTD DBM Admin"
-                  crossOrigin="anonymous"
-                  className="max-h-14 max-w-[120px] object-contain mx-auto"
-                />
-              ) : (
-                <div className="h-14 w-28" />
+
+            {/* Spacer penahan tinggi agar ukuran baris tetap stabil */}
+            <div className="h-16 w-full relative" style={{ overflow: 'visible' }}>
+              {ttdMode === 'ada' && ttdImages?.dbm_admin && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                  style={{
+                    bottom: '2px',
+                    width: '85%',
+                    height: '75px',
+                    zIndex: 10,
+                    overflow: 'visible',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ttdImages.dbm_admin}
+                    alt="TTD DBM Admin"
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-contain mx-auto"
+                    style={{
+                      objectFit: 'contain',
+                      objectPosition: 'bottom center',
+                      mixBlendMode: 'multiply',
+                    }}
+                  />
+                </div>
               )}
             </div>
+
             <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
               RICKY MARIO
             </p>
           </div>
 
           {/* Kolom 2: Mengetahui 1, Human Resource Manager - ABEDNEGO SETYA NUGROHO */}
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center relative" style={{ overflow: 'visible' }}>
             <p className="font-medium text-xs mb-0.5">Mengetahui 1,</p>
             <p className="font-bold text-xs mb-1">Human Resource Manager</p>
-            <div className="h-16 flex items-center justify-center my-0.5 w-full">
-              {ttdMode === 'ada' && ttdImages?.hrd_manager ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={ttdImages.hrd_manager}
-                  alt="TTD HRD Manager"
-                  crossOrigin="anonymous"
-                  className="max-h-14 max-w-[120px] object-contain mx-auto"
-                />
-              ) : (
-                <div className="h-14 w-28" />
+
+            <div className="h-16 w-full relative" style={{ overflow: 'visible' }}>
+              {ttdMode === 'ada' && ttdImages?.hrd_manager && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                  style={{
+                    bottom: '2px',
+                    width: '85%',
+                    height: '75px',
+                    zIndex: 10,
+                    overflow: 'visible',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ttdImages.hrd_manager}
+                    alt="TTD HRD Manager"
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-contain mx-auto"
+                    style={{
+                      objectFit: 'contain',
+                      objectPosition: 'bottom center',
+                      mixBlendMode: 'multiply',
+                    }}
+                  />
+                </div>
               )}
             </div>
+
             <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
               ABEDNEGO SETYA NUGROHO
             </p>
           </div>
 
           {/* Kolom 3: Membuat, Training Center Supervisor - ROKHMAN */}
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center relative" style={{ overflow: 'visible' }}>
             <p className="font-medium text-xs mb-0.5">Membuat,</p>
             <p className="font-bold text-xs mb-1">Training Center Supervisor</p>
-            <div className="h-16 flex items-center justify-center my-0.5 w-full">
-              {ttdMode === 'ada' && ttdImages?.tc_supervisor ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={ttdImages.tc_supervisor}
-                  alt="TTD TC Supervisor"
-                  crossOrigin="anonymous"
-                  className="max-h-14 max-w-[120px] object-contain mx-auto"
-                />
-              ) : (
-                <div className="h-14 w-28" />
+
+            <div className="h-16 w-full relative" style={{ overflow: 'visible' }}>
+              {ttdMode === 'ada' && ttdImages?.tc_supervisor && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                  style={{
+                    bottom: '2px',
+                    width: '85%',
+                    height: '75px',
+                    zIndex: 10,
+                    overflow: 'visible',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ttdImages.tc_supervisor}
+                    alt="TTD TC Supervisor"
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-contain mx-auto"
+                    style={{
+                      objectFit: 'contain',
+                      objectPosition: 'bottom center',
+                      mixBlendMode: 'multiply',
+                    }}
+                  />
+                </div>
               )}
             </div>
+
             <p className="font-bold text-xs uppercase underline tracking-wider mt-1">
               ROKHMAN
             </p>

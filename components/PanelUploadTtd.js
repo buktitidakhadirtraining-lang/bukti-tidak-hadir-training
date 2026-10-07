@@ -51,7 +51,7 @@ async function processSignatureFile(file, removeWhiteBg = true) {
   });
 
   let { width, height } = img;
-  const maxW = 800;
+  const maxW = 1000;
   if (width > maxW) {
     height = Math.round((height * maxW) / width);
     width = maxW;

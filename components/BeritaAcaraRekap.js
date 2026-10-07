@@ -203,94 +203,218 @@ export default function BeritaAcaraRekap({
             <tr>
               {/* Kolom 1: DBM Operasional */}
               <td
-                className="p-1 align-bottom"
-                style={{ border: '0.75px solid #000000', width: '25%' }}
+                className="p-1 align-bottom relative"
+                style={{
+                  border: '0.75px solid #000000',
+                  width: '25%',
+                  position: 'relative',
+                  overflow: 'visible',
+                }}
               >
-                <div className="h-16 flex items-center justify-center mb-1 w-full">
-                  {ttdMode === 'ada' && ttdImages?.dbm_operasional ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                {/* Spacer penahan tinggi baris agar ukuran tabel 100% konsisten */}
+                <div className="h-16 w-full" />
+
+                {/* Garis tanda tangan horizontal tipis di atas nama jabatan (80% lebar kolom, rata tengah) */}
+                <div
+                  className="mx-auto w-[80%] mb-1"
+                  style={{ borderTop: '0.75px solid #000000' }}
+                />
+
+                {/* Teks Nama Jabatan */}
+                <div className="px-1 pb-0.5">
+                  <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
+                    DBM Operasional
+                  </span>
+                </div>
+
+                {/* Gambar TTD besar mengambang absolut di atas garis (kaki menyentuh/sedikit melewati garis) */}
+                {ttdMode === 'ada' && ttdImages?.dbm_operasional && (
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                    style={{
+                      bottom: '16px',
+                      width: '80%',
+                      height: '75px',
+                      zIndex: 10,
+                      overflow: 'visible',
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={ttdImages.dbm_operasional}
                       alt="TTD DBM Operasional"
                       crossOrigin="anonymous"
-                      className="max-h-14 max-w-full object-contain mx-auto"
+                      className="w-full h-full object-contain mx-auto"
+                      style={{
+                        objectFit: 'contain',
+                        objectPosition: 'bottom center',
+                        mixBlendMode: 'multiply',
+                      }}
                     />
-                  ) : (
-                    <div className="h-14" />
-                  )}
-                </div>
-                <div className="border-t border-black pt-1 mx-2">
-                  <span className="font-bold block text-center">DBM Operasional</span>
-                </div>
+                  </div>
+                )}
               </td>
 
               {/* Kolom 2: DBM Admin */}
               <td
-                className="p-1 align-bottom"
-                style={{ border: '0.75px solid #000000', width: '25%' }}
+                className="p-1 align-bottom relative"
+                style={{
+                  border: '0.75px solid #000000',
+                  width: '25%',
+                  position: 'relative',
+                  overflow: 'visible',
+                }}
               >
-                <div className="h-16 flex items-center justify-center mb-1 w-full">
-                  {ttdMode === 'ada' && ttdImages?.dbm_admin ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                <div className="h-16 w-full" />
+
+                <div
+                  className="mx-auto w-[80%] mb-1"
+                  style={{ borderTop: '0.75px solid #000000' }}
+                />
+
+                <div className="px-1 pb-0.5">
+                  <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
+                    DBM Admin
+                  </span>
+                </div>
+
+                {ttdMode === 'ada' && ttdImages?.dbm_admin && (
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                    style={{
+                      bottom: '16px',
+                      width: '80%',
+                      height: '75px',
+                      zIndex: 10,
+                      overflow: 'visible',
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={ttdImages.dbm_admin}
                       alt="TTD DBM Admin"
                       crossOrigin="anonymous"
-                      className="max-h-14 max-w-full object-contain mx-auto"
+                      className="w-full h-full object-contain mx-auto"
+                      style={{
+                        objectFit: 'contain',
+                        objectPosition: 'bottom center',
+                        mixBlendMode: 'multiply',
+                      }}
                     />
-                  ) : (
-                    <div className="h-14" />
-                  )}
-                </div>
-                <div className="border-t border-black pt-1 mx-2">
-                  <span className="font-bold block text-center">DBM Admin</span>
-                </div>
+                  </div>
+                )}
               </td>
 
               {/* Kolom 3: HRD Manager */}
               <td
-                className="p-1 align-bottom"
-                style={{ border: '0.75px solid #000000', width: '25%' }}
+                className="p-1 align-bottom relative"
+                style={{
+                  border: '0.75px solid #000000',
+                  width: '25%',
+                  position: 'relative',
+                  overflow: 'visible',
+                }}
               >
-                <div className="h-16 flex items-center justify-center mb-1 w-full">
-                  {ttdMode === 'ada' && ttdImages?.hrd_manager ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                <div className="h-16 w-full" />
+
+                <div
+                  className="mx-auto w-[80%] mb-1"
+                  style={{ borderTop: '0.75px solid #000000' }}
+                />
+
+                <div className="px-1 pb-0.5">
+                  <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
+                    HRD Manager
+                  </span>
+                </div>
+
+                {ttdMode === 'ada' && ttdImages?.hrd_manager && (
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                    style={{
+                      bottom: '16px',
+                      width: '80%',
+                      height: '75px',
+                      zIndex: 10,
+                      overflow: 'visible',
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={ttdImages.hrd_manager}
                       alt="TTD HRD Manager"
                       crossOrigin="anonymous"
-                      className="max-h-14 max-w-full object-contain mx-auto"
+                      className="w-full h-full object-contain mx-auto"
+                      style={{
+                        objectFit: 'contain',
+                        objectPosition: 'bottom center',
+                        mixBlendMode: 'multiply',
+                      }}
                     />
-                  ) : (
-                    <div className="h-14" />
-                  )}
-                </div>
-                <div className="border-t border-black pt-1 mx-2">
-                  <span className="font-bold block text-center">HRD Manager</span>
-                </div>
+                  </div>
+                )}
               </td>
 
               {/* Kolom 4: TC Supervisor */}
               <td
-                className="p-1 align-bottom"
-                style={{ border: '0.75px solid #000000', width: '25%' }}
+                className="p-1 align-bottom relative"
+                style={{
+                  border: '0.75px solid #000000',
+                  width: '25%',
+                  position: 'relative',
+                  overflow: 'visible',
+                }}
               >
-                <div className="h-16 flex items-center justify-center mb-1 w-full">
-                  {ttdMode === 'ada' && ttdImages?.tc_supervisor ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+                <div className="h-16 w-full" />
+
+                <div
+                  className="mx-auto w-[80%] mb-1"
+                  style={{ borderTop: '0.75px solid #000000' }}
+                />
+
+                <div className="px-1 pb-0.5">
+                  <span className="font-bold block text-center" style={{ fontSize: '11px' }}>
+                    TC Supervisor
+                  </span>
+                </div>
+
+                {ttdMode === 'ada' && ttdImages?.tc_supervisor && (
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                    style={{
+                      bottom: '16px',
+                      width: '80%',
+                      height: '75px',
+                      zIndex: 10,
+                      overflow: 'visible',
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={ttdImages.tc_supervisor}
                       alt="TTD TC Supervisor"
                       crossOrigin="anonymous"
-                      className="max-h-14 max-w-full object-contain mx-auto"
+                      className="w-full h-full object-contain mx-auto"
+                      style={{
+                        objectFit: 'contain',
+                        objectPosition: 'bottom center',
+                        mixBlendMode: 'multiply',
+                      }}
                     />
-                  ) : (
-                    <div className="h-14" />
-                  )}
-                </div>
-                <div className="border-t border-black pt-1 mx-2">
-                  <span className="font-bold block text-center">TC Supervisor</span>
-                </div>
+                  </div>
+                )}
               </td>
             </tr>
           </tbody>

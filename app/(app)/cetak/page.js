@@ -622,19 +622,32 @@ export default function CetakPage() {
             3: { cellWidth: 46.5 },
           },
           didDrawCell: function (data) {
-            if (ttdMode === 'ada' && data.section === 'body' && data.row.index === 0) {
-              const roles = ['dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor'];
-              const roleKey = roles[data.column.index];
-              const imgData = ttdImages && ttdImages[roleKey];
-              if (imgData) {
-                try {
-                  const imgW = 28;
-                  const imgH = 13;
-                  const x = data.cell.x + (data.cell.width - imgW) / 2;
-                  const y = data.cell.y + (data.cell.height - imgH - 5);
-                  doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
-                } catch (imgErr) {
-                  console.warn('Gagal menambahkan TTD ke PDF:', imgErr);
+            if (data.section === 'body' && data.row.index === 0) {
+              // 1. Gambar garis tanda tangan horizontal tipis (80% lebar kolom, 3-4mm di atas teks nama jabatan)
+              const lineWidth = data.cell.width * 0.8;
+              const lineX1 = data.cell.x + (data.cell.width - lineWidth) / 2;
+              const lineX2 = lineX1 + lineWidth;
+              const lineY = data.cell.y + data.cell.height - 6.2;
+
+              doc.setDrawColor(0, 0, 0);
+              doc.setLineWidth(0.25);
+              doc.line(lineX1, lineY, lineX2, lineY);
+
+              // 2. Jika versi "Ada TTD", gambar TTD besar (82% lebar kolom) berdiri di atas garis
+              if (ttdMode === 'ada') {
+                const roles = ['dbm_operasional', 'dbm_admin', 'hrd_manager', 'tc_supervisor'];
+                const roleKey = roles[data.column.index];
+                const imgData = ttdImages && ttdImages[roleKey];
+                if (imgData) {
+                  try {
+                    const imgW = data.cell.width * 0.82;
+                    const imgH = 19;
+                    const x = data.cell.x + (data.cell.width - imgW) / 2;
+                    const y = lineY - imgH + 1.2;
+                    doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
+                  } catch (imgErr) {
+                    console.warn('Gagal menambahkan TTD ke PDF:', imgErr);
+                  }
                 }
               }
             }
@@ -778,19 +791,30 @@ export default function CetakPage() {
             2: { cellWidth: 62 },
           },
           didDrawCell: function (data) {
-            if (softSkillTtdMode === 'ada' && data.section === 'body' && data.row.index === 0) {
-              const roles = ['dbm_admin', 'hrd_manager', 'tc_supervisor'];
-              const roleKey = roles[data.column.index];
-              const imgData = ttdImages && ttdImages[roleKey];
-              if (imgData) {
-                try {
-                  const imgW = 28;
-                  const imgH = 13;
-                  const x = data.cell.x + (data.cell.width - imgW) / 2;
-                  const y = data.cell.y + (data.cell.height - imgH - 5);
-                  doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
-                } catch (imgErr) {
-                  console.warn('Gagal menambahkan TTD Soft Skill ke PDF:', imgErr);
+            if (data.section === 'body' && data.row.index === 0) {
+              const lineWidth = data.cell.width * 0.8;
+              const lineX1 = data.cell.x + (data.cell.width - lineWidth) / 2;
+              const lineX2 = lineX1 + lineWidth;
+              const lineY = data.cell.y + data.cell.height - 6.2;
+
+              doc.setDrawColor(0, 0, 0);
+              doc.setLineWidth(0.25);
+              doc.line(lineX1, lineY, lineX2, lineY);
+
+              if (softSkillTtdMode === 'ada') {
+                const roles = ['dbm_admin', 'hrd_manager', 'tc_supervisor'];
+                const roleKey = roles[data.column.index];
+                const imgData = ttdImages && ttdImages[roleKey];
+                if (imgData) {
+                  try {
+                    const imgW = data.cell.width * 0.8;
+                    const imgH = 20;
+                    const x = data.cell.x + (data.cell.width - imgW) / 2;
+                    const y = lineY - imgH + 1.2;
+                    doc.addImage(imgData, 'PNG', x, y, imgW, imgH);
+                  } catch (imgErr) {
+                    console.warn('Gagal menambahkan TTD Soft Skill ke PDF:', imgErr);
+                  }
                 }
               }
             }
