@@ -1,7 +1,7 @@
 // app/(app)/cetak/page.js
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Printer,
   Download,
@@ -27,6 +27,9 @@ import {
   Search,
   XCircle,
   FileCheck,
+  ChevronDown,
+  X,
+  Check,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -106,6 +109,165 @@ export default function CetakPage() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [trainerName, setTrainerName] = useState('Budi Setiawan');
   const [managerName, setManagerName] = useState('Hendra Wijaya');
+
+  // Multi-select Jenis Training khusus Format Horizontal (3/4 Kolom)
+  const [selectedHorizontalTrainingIds, setSelectedHorizontalTrainingIds] = useState([]);
+  const [isTrainingDropdownOpen, setIsTrainingDropdownOpen] = useState(false);
+  const [trainingSearchQuery, setTrainingSearchQuery] = useState('');
+  const [hasRestoredStorage, setHasRestoredStorage] = useState(false);
+  const trainingDropdownRef = useRef(null);
+
+  // Listener untuk klik di luar dropdown & tombol Esc
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (trainingDropdownRef.current && !trainingDropdownRef.current.contains(event.target)) {
+        setIsTrainingDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setIsTrainingDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const masterTrainings = useMemo(() => {
+    return meta?.trainings || [];
+  }, [meta]);
+
+  const storageKeyHorizontal = useMemo(() => {
+    return `cetak_horizontal_trainings_${branchId || 'all'}_${meta?.userId || 'default'}`;
+  }, [branchId, meta?.userId]);
+
+  // Restorasi pilihan tersimpan di localStorage saat master / branch dimuat
+  useEffect(() => {
+    if (!masterTrainings || masterTrainings.length === 0) return;
+
+    try {
+      const savedJson = localStorage.getItem(storageKeyHorizontal);
+      if (savedJson) {
+        const savedIds = JSON.parse(savedJson);
+        if (Array.isArray(savedIds)) {
+          const masterIds = masterTrainings.map((t) => t.id);
+          const validSaved = savedIds.filter((id) => masterIds.includes(id));
+          const newMasterIds = masterIds.filter((id) => !savedIds.includes(id));
+          setSelectedHorizontalTrainingIds([...validSaved, ...newMasterIds]);
+          setHasRestoredStorage(true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[localStorage restore error]:', e);
+    }
+
+    // Default: Semua jenis training terpilih
+    setSelectedHorizontalTrainingIds(masterTrainings.map((t) => t.id));
+    setHasRestoredStorage(true);
+  }, [masterTrainings, storageKeyHorizontal]);
+
+  // Simpan pilihan ke localStorage setiap ada perubahan
+  useEffect(() => {
+    if (!hasRestoredStorage) return;
+    try {
+      localStorage.setItem(storageKeyHorizontal, JSON.stringify(selectedHorizontalTrainingIds));
+    } catch (e) {
+      console.warn('[localStorage save error]:', e);
+    }
+  }, [selectedHorizontalTrainingIds, storageKeyHorizontal, hasRestoredStorage]);
+
+  // Hitung jumlah data peserta per jenis training untuk filter cabang/bulan/tahun aktif
+  const trainingRecordCounts = useMemo(() => {
+    const map = new Map();
+    (records || []).forEach((r) => {
+      const tId = r.training_id;
+      const tName = r.training_types?.name;
+      if (tId) map.set(tId, (map.get(tId) || 0) + 1);
+      if (tName) map.set(tName, (map.get(tName) || 0) + 1);
+    });
+    return map;
+  }, [records]);
+
+  // Record yang difilter untuk format horizontal
+  const filteredHorizontalRecords = useMemo(() => {
+    if (printFormat !== 'horizontal') return records;
+    if (selectedHorizontalTrainingIds.length === 0) return [];
+    return records.filter((r) => {
+      const tId = r.training_id;
+      const tName = r.training_types?.name;
+      return selectedHorizontalTrainingIds.some(
+        (id) => id === tId || meta?.trainings?.find((t) => t.id === id)?.name === tName
+      );
+    });
+  }, [records, printFormat, selectedHorizontalTrainingIds, meta]);
+
+  // Helper toggle dan aksi tombol multi-select
+  const toggleTrainingSelection = (id) => {
+    setSelectedHorizontalTrainingIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleSelectAllWithData = () => {
+    const withData = masterTrainings.filter(
+      (t) => (trainingRecordCounts.get(t.id) || trainingRecordCounts.get(t.name) || 0) > 0
+    );
+    if (withData.length > 0) {
+      setSelectedHorizontalTrainingIds(withData.map((t) => t.id));
+    } else {
+      setSelectedHorizontalTrainingIds(masterTrainings.map((t) => t.id));
+    }
+  };
+
+  const handleDeselectAllTrainings = () => {
+    setSelectedHorizontalTrainingIds([]);
+  };
+
+  const handleResetHorizontalTrainings = () => {
+    const allIds = masterTrainings.map((t) => t.id);
+    setSelectedHorizontalTrainingIds(allIds);
+    try {
+      localStorage.removeItem(storageKeyHorizontal);
+    } catch (e) {}
+    toast.info('Pilihan jenis training dikembalikan ke semua terpilih.');
+  };
+
+  const isAllSelectedHorizontal = useMemo(() => {
+    if (!masterTrainings || masterTrainings.length === 0) return true;
+    return masterTrainings.every((t) => selectedHorizontalTrainingIds.includes(t.id));
+  }, [masterTrainings, selectedHorizontalTrainingIds]);
+
+  const selectedTrainingNamesText = useMemo(() => {
+    if (!masterTrainings || masterTrainings.length === 0) return '';
+    const selectedObjs = masterTrainings.filter((t) =>
+      selectedHorizontalTrainingIds.includes(t.id)
+    );
+    return selectedObjs.map((t) => t.name).join(', ');
+  }, [masterTrainings, selectedHorizontalTrainingIds]);
+
+  const summaryTrainingLabel = useMemo(() => {
+    if (!masterTrainings || masterTrainings.length === 0) return 'Semua Training';
+    const selCount = selectedHorizontalTrainingIds.length;
+    if (selCount === 0) {
+      return 'Belum ada training dipilih';
+    }
+    if (isAllSelectedHorizontal) {
+      return `Semua Training (${masterTrainings.length})`;
+    }
+    if (selCount <= 2) {
+      return selectedTrainingNamesText;
+    }
+    return `${selCount} training dipilih`;
+  }, [masterTrainings, selectedHorizontalTrainingIds, isAllSelectedHorizontal, selectedTrainingNamesText]);
 
   // Tracking loaded images for Format Horizontal
   const [loadedImageIds, setLoadedImageIds] = useState(new Set());
@@ -284,7 +446,7 @@ export default function CetakPage() {
       const params = new URLSearchParams();
       params.set('limit', '400');
       if (branchId) params.set('branch_id', branchId);
-      if (trainingId) params.set('training_id', trainingId);
+      if (trainingId && printFormat !== 'horizontal') params.set('training_id', trainingId);
       if (batch) params.set('batch', batch);
       if (month) params.set('month', month);
       if (year) params.set('year', year);
@@ -300,7 +462,7 @@ export default function CetakPage() {
     } finally {
       setLoading(false);
     }
-  }, [branchId, trainingId, batch, month, year]);
+  }, [branchId, trainingId, batch, month, year, printFormat]);
 
   useEffect(() => {
     fetchRecords();
@@ -434,6 +596,8 @@ export default function CetakPage() {
               (p) => String(p.nik).trim() === String(r.nik).trim()
             )
           )
+        : printFormat === 'horizontal'
+        ? filteredHorizontalRecords
         : records;
 
     for (const r of relevantRecords) {
@@ -450,7 +614,7 @@ export default function CetakPage() {
       }
     }
     return list;
-  }, [records, filteredSoftSkillData, printFormat, photoCache]);
+  }, [records, filteredSoftSkillData, filteredHorizontalRecords, printFormat, photoCache]);
 
   // Kumpulkan daftar foto yang berhasil dipulihkan lewat Self-Healing (perlu perbaikan DB)
   const healedPhotosList = useMemo(() => {
@@ -462,6 +626,8 @@ export default function CetakPage() {
               (p) => String(p.nik).trim() === String(r.nik).trim()
             )
           )
+        : printFormat === 'horizontal'
+        ? filteredHorizontalRecords
         : records;
 
     for (const r of relevantRecords) {
@@ -480,7 +646,7 @@ export default function CetakPage() {
       }
     }
     return list;
-  }, [records, filteredSoftSkillData, printFormat, photoCache]);
+  }, [records, filteredSoftSkillData, filteredHorizontalRecords, printFormat, photoCache]);
 
   // State & Handler Perbaikan Referensi Database
   const [isFixingReference, setIsFixingReference] = useState(false);
@@ -528,6 +694,8 @@ export default function CetakPage() {
               (p) => String(p.nik).trim() === String(r.nik).trim()
             )
           )
+        : printFormat === 'horizontal'
+        ? filteredHorizontalRecords
         : records;
 
     if (!relevantRecords || relevantRecords.length === 0) {
@@ -602,6 +770,10 @@ export default function CetakPage() {
   };
 
   function handlePrint() {
+    if (printFormat === 'horizontal' && selectedHorizontalTrainingIds.length === 0) {
+      toast.error('Pilih minimal satu jenis training untuk dicetak');
+      return;
+    }
     if (failedPhotosList.length > 0) {
       const proceed = window.confirm(
         `${failedPhotosList.length} foto bukti belum berhasil termuat. Apakah Anda ingin tetap melanjutkan proses Cetak?`
@@ -614,6 +786,11 @@ export default function CetakPage() {
   // Fungsi mengunduh berkas fisik PDF berbasis Teks & Vector (jsPDF + jspdf-autotable)
   async function handleDownloadPdf() {
     if (downloadingPdf) return;
+
+    if (printFormat === 'horizontal' && selectedHorizontalTrainingIds.length === 0) {
+      toast.error('Pilih minimal satu jenis training untuk dicetak');
+      return;
+    }
 
     if (failedPhotosList.length > 0) {
       const proceed = window.confirm(
@@ -1452,9 +1629,16 @@ export default function CetakPage() {
         doc.addImage(imgData, 'JPEG', x, y, drawWidth, drawHeight);
       }
 
-      let filename = printFormat === 'horizontal'
-        ? `Lampiran_Bukti_Foto_Horizontal_${year}.pdf`
-        : `Berita_Acara_Lama_${year}.pdf`;
+      let filename;
+      if (printFormat === 'horizontal') {
+        if (selectedHorizontalTrainingIds.length < masterTrainings.length) {
+          filename = `Lampiran_Bukti_Foto_Horizontal_${year}_${selectedHorizontalTrainingIds.length}_Training.pdf`;
+        } else {
+          filename = `Lampiran_Bukti_Foto_Horizontal_${year}.pdf`;
+        }
+      } else {
+        filename = `Berita_Acara_Lama_${year}.pdf`;
+      }
 
       doc.save(filename);
       toast.success('Berkas PDF berhasil diunduh ke folder Downloads!', { id: toastId });
@@ -1483,7 +1667,8 @@ export default function CetakPage() {
 
   // Pengelompokan data per jenis training untuk Format Horizontal
   const trainingGroups = useMemo(() => {
-    const groups = records.reduce((acc, r) => {
+    const recordsToGroup = printFormat === 'horizontal' ? filteredHorizontalRecords : records;
+    const groups = recordsToGroup.reduce((acc, r) => {
       const tId = r.training_id || 'unassigned';
       const tName = r.training_types?.name || 'Tanpa Jenis Training';
       if (!acc[tId]) {
@@ -1492,8 +1677,21 @@ export default function CetakPage() {
       acc[tId].records.push(r);
       return acc;
     }, {});
-    return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
-  }, [records]);
+
+    // Urutkan sesuai urutan master data di meta?.trainings
+    const masterOrderMap = new Map();
+    (meta?.trainings || []).forEach((t, idx) => {
+      masterOrderMap.set(t.id, idx);
+      masterOrderMap.set(t.name, idx);
+    });
+
+    return Object.values(groups).sort((a, b) => {
+      const orderA = masterOrderMap.get(a.id) ?? masterOrderMap.get(a.name) ?? 999;
+      const orderB = masterOrderMap.get(b.id) ?? masterOrderMap.get(b.name) ?? 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+  }, [records, filteredHorizontalRecords, printFormat, meta]);
 
   // Daftar jenis training unik dari sheet list_tidak_hadir
   const uniqueTrainingsFromList = useMemo(() => {
@@ -1703,7 +1901,7 @@ export default function CetakPage() {
               <span>Total: <strong className="text-gray-800">{listTidakHadirData.length}</strong> peserta tidak hadir</span>
             )}
             {(printFormat === 'horizontal' || printFormat === 'lama') && (
-              <span>Menampilkan: <strong className="text-gray-800">{records.length}</strong> data</span>
+              <span>Menampilkan: <strong className="text-gray-800">{printFormat === 'horizontal' ? filteredHorizontalRecords.length : records.length}</strong> data</span>
             )}
           </div>
         </div>
@@ -2326,18 +2524,157 @@ export default function CetakPage() {
 
               <div>
                 <label className="block font-bold text-gray-600 mb-1">Jenis Training</label>
-                <select
-                  value={trainingId}
-                  onChange={(e) => setTrainingId(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
-                >
-                  <option value="">Semua Training</option>
-                  {meta?.trainings?.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                {printFormat === 'horizontal' ? (
+                  <div className="relative" ref={trainingDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsTrainingDropdownOpen((prev) => !prev)}
+                      className={`w-full bg-gray-50 border rounded-xl p-2 text-xs font-medium flex items-center justify-between gap-1 hover:bg-gray-100 transition-colors cursor-pointer ${
+                        selectedHorizontalTrainingIds.length === 0
+                          ? 'border-red-300 bg-red-50/50'
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`truncate ${
+                          selectedHorizontalTrainingIds.length === 0
+                            ? 'text-red-600 font-bold'
+                            : 'text-gray-900 font-bold'
+                        }`}
+                      >
+                        {summaryTrainingLabel}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-gray-500 shrink-0 transition-transform ${
+                          isTrainingDropdownOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {/* Popover Dropdown Multi-Select */}
+                    {isTrainingDropdownOpen && (
+                      <div className="absolute left-0 right-0 sm:right-auto sm:w-72 z-50 mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden animate-fade-in p-2.5 space-y-2">
+                        {/* Pencarian */}
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Cari jenis training..."
+                            value={trainingSearchQuery}
+                            onChange={(e) => setTrainingSearchQuery(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-2 py-1.5 text-xs font-medium focus:ring-1 focus:ring-[#0056b3] outline-none"
+                          />
+                        </div>
+
+                        {/* Tombol Aksi */}
+                        <div className="flex items-center justify-between gap-1 text-[11px] pb-1 border-b border-gray-100">
+                          <button
+                            type="button"
+                            onClick={handleSelectAllWithData}
+                            className="text-[#0056b3] hover:underline font-bold px-1 py-0.5 rounded cursor-pointer"
+                          >
+                            Pilih Semua
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDeselectAllTrainings}
+                            className="text-gray-600 hover:text-red-600 hover:underline font-semibold px-1 py-0.5 rounded cursor-pointer"
+                          >
+                            Kosongkan
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleResetHorizontalTrainings}
+                            className="text-gray-500 hover:text-gray-900 hover:underline px-1 py-0.5 rounded cursor-pointer"
+                          >
+                            Reset Pilihan
+                          </button>
+                        </div>
+
+                        {/* Daftar Baris Jenis Training */}
+                        <div className="max-h-56 overflow-y-auto space-y-0.5 pr-0.5">
+                          {masterTrainings
+                            .filter((t) =>
+                              t.name.toLowerCase().includes(trainingSearchQuery.toLowerCase())
+                            )
+                            .map((t) => {
+                              const count =
+                                trainingRecordCounts.get(t.id) ||
+                                trainingRecordCounts.get(t.name) ||
+                                0;
+                              const isDisabled = count === 0;
+                              const isChecked = selectedHorizontalTrainingIds.includes(t.id);
+
+                              if (isDisabled) {
+                                return (
+                                  <div
+                                    key={t.id}
+                                    className="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs text-gray-400 bg-gray-50/50 cursor-not-allowed opacity-60 select-none"
+                                    title="Tidak ada data peserta pada periode yang dipilih"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        disabled
+                                        checked={false}
+                                        className="w-3.5 h-3.5 rounded text-gray-300 border-gray-300"
+                                      />
+                                      <span>{t.name}</span>
+                                    </div>
+                                    <span className="font-mono text-[10px] text-gray-400">(0)</span>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <label
+                                  key={t.id}
+                                  className="flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-semibold text-gray-800 hover:bg-blue-50/80 cursor-pointer transition-colors select-none"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => toggleTrainingSelection(t.id)}
+                                      className="w-3.5 h-3.5 rounded text-[#0056b3] focus:ring-[#0056b3] accent-[#0056b3]"
+                                    />
+                                    <span>{t.name}</span>
+                                  </div>
+                                  <span
+                                    className={`font-mono text-[11px] font-bold ${
+                                      isChecked ? 'text-[#0056b3]' : 'text-gray-500'
+                                    }`}
+                                  >
+                                    ({count})
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          {masterTrainings.filter((t) =>
+                            t.name.toLowerCase().includes(trainingSearchQuery.toLowerCase())
+                          ).length === 0 && (
+                            <div className="p-3 text-center text-gray-400 italic text-xs">
+                              Tidak ada jenis training yang cocok
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <select
+                    value={trainingId}
+                    onChange={(e) => setTrainingId(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
+                  >
+                    <option value="">Semua Training</option>
+                    {meta?.trainings?.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -2396,6 +2733,42 @@ export default function CetakPage() {
                 </>
               )}
             </div>
+
+            {/* Chips Pilihan Jenis Training Sebagian (Khusus Format Horizontal) */}
+            {printFormat === 'horizontal' &&
+              selectedHorizontalTrainingIds.length > 0 &&
+              selectedHorizontalTrainingIds.length < masterTrainings.length && (
+                <div className="pt-2.5 border-t border-gray-100 flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="font-semibold text-gray-500 text-[11px]">Training Ditampilkan:</span>
+                  {selectedHorizontalTrainingIds.map((id) => {
+                    const trObj = masterTrainings.find((t) => t.id === id);
+                    const name = trObj ? trObj.name : id;
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-[#0056b3] text-[11px] font-bold border border-blue-200"
+                      >
+                        <span>{name}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleTrainingSelection(id)}
+                          className="hover:bg-blue-200 rounded p-0.5 transition-colors cursor-pointer"
+                          title={`Hapus ${name}`}
+                        >
+                          <X className="w-3 h-3 text-[#0056b3]" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={handleResetHorizontalTrainings}
+                    className="text-[11px] font-semibold text-gray-600 hover:text-gray-900 underline ml-1 cursor-pointer"
+                  >
+                    Reset Pilihan
+                  </button>
+                </div>
+              )}
           </div>
         )}
       </div>
@@ -2641,7 +3014,17 @@ export default function CetakPage() {
               margin: 0 !important;
             }
           `}</style>
-          {trainingGroups.length > 0 ? (
+          {selectedHorizontalTrainingIds.length === 0 ? (
+            <div className="bg-amber-50 border-2 border-dashed border-amber-300 rounded-2xl p-12 text-center max-w-2xl mx-auto my-8 shadow-xs no-print">
+              <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+              <h3 className="text-base font-black text-amber-900 font-title mb-1">
+                Belum Ada Jenis Training yang Dipilih
+              </h3>
+              <p className="text-xs text-amber-800 font-medium">
+                Pilih minimal satu jenis training untuk dicetak. Gunakan filter &quot;Jenis Training&quot; di atas untuk mencentang training yang ingin ditampilkan.
+              </p>
+            </div>
+          ) : trainingGroups.length > 0 ? (
             trainingGroups.flatMap((group, groupIdx) => {
               // Paginasi: 2 baris penuh per halaman A4 landscape
               // Jika 3 kolom: 6 peserta per halaman (3 kolom x 2 baris)
