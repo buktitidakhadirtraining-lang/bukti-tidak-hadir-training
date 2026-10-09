@@ -1,7 +1,7 @@
 // app/(app)/input-tambahan/page.js
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   UserPlus,
   Save,
@@ -15,16 +15,25 @@ import {
   UploadCloud,
   Download,
   Building2,
+  Image as ImageIcon,
+  FileCheck,
+  X,
+  AlertTriangle,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MASTER_TRAININGS_LIST } from '../../../lib/trainings-master.js';
+import { compressImage, formatBytes } from '../../../lib/compress.js';
 import EditDataTambahanModal from '../../../components/EditDataTambahanModal.js';
 import ImportExportModal from '../../../components/ImportExportModal.js';
 import ConfirmDialog from '../../../components/ConfirmDialog.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
+import ProofImageDisplay from '../../../components/ProofImageDisplay.js';
 import { Database } from 'lucide-react';
 
 export default function InputTambahanPage() {
+  const fileInputRef = useRef(null);
+
   const [training, setTraining] = useState('YFC');
   const [nik, setNik] = useState('');
   const [nama, setNama] = useState('');
@@ -32,7 +41,15 @@ export default function InputTambahanPage() {
   const [namaToko, setNamaToko] = useState('');
   const [alasanTidakHadir, setAlasanTidakHadir] = useState('Sakit');
 
+  // Foto State
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [fileStats, setFileStats] = useState(null);
+  const [compressing, setCompressing] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const [saving, setSaving] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState(null);
   const [loadingList, setLoadingList] = useState(false);
   const [records, setRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,6 +60,7 @@ export default function InputTambahanPage() {
   const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [viewingPhotoRecord, setViewingPhotoRecord] = useState(null);
   const [deleteSingleDialog, setDeleteSingleDialog] = useState({
     isOpen: false,
     record: null,
@@ -94,29 +112,89 @@ export default function InputTambahanPage() {
     fetchRecords();
   }, [fetchRecords]);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleFileSelect(file) {
+    if (!file) return;
+
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      toast.error(`Ukuran file melebihi batas maksimal 5 MB (${formatBytes(file.size)}). Harap pilih foto lain.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setCompressing(true);
+    try {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      const res = await compressImage(file, { maxSide: 1600, forceCompress: true });
+      setSelectedFile(res.file);
+      setFileStats({
+        originalSize: res.originalSize,
+        compressedSize: res.compressedSize,
+        sizeSummary: res.sizeSummary,
+      });
+      setPreviewUrl(URL.createObjectURL(res.blob));
+      toast.success(`Foto berhasil dikompresi (${res.sizeSummary})`);
+    } catch (err) {
+      console.error('[Compression Error]:', err);
+      toast.error(err.message || 'Gagal memproses gambar');
+      removeSelectedPhoto();
+    } finally {
+      setCompressing(false);
+    }
+  }
+
+  function removeSelectedPhoto() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setFileStats(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleSubmit(e, skipPhoto = false) {
+    if (e?.preventDefault) e.preventDefault();
     if (!nik.trim() || !nama.trim()) {
       toast.error('NIK dan Nama Peserta wajib diisi');
       return;
     }
 
     setSaving(true);
-    const toastId = toast.loading('Menyimpan data ke database cabang...');
+    const hasPhoto = selectedFile && !skipPhoto;
+    setSubmitProgress(hasPhoto ? 'Mengunggah foto...' : 'Menyimpan data...');
+    const toastId = toast.loading(hasPhoto ? 'Mengunggah foto ke Google Drive cabang...' : 'Menyimpan data ke database cabang...');
 
     try {
-      const res = await fetch('/api/data-tambahan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          training: training.trim(),
-          nik: nik.trim(),
-          nama: nama.trim(),
-          kd_toko: kdToko.trim(),
-          nama_toko: namaToko.trim(),
-          alasan_tidak_hadir: alasanTidakHadir.trim(),
-        }),
-      });
+      let res;
+      if (hasPhoto) {
+        const formData = new FormData();
+        formData.append('training', training.trim());
+        formData.append('nik', nik.trim());
+        formData.append('nama', nama.trim());
+        formData.append('kd_toko', kdToko.trim());
+        formData.append('nama_toko', namaToko.trim());
+        formData.append('alasan_tidak_hadir', alasanTidakHadir.trim());
+        formData.append('foto', selectedFile);
+
+        setSubmitProgress('Mengunggah foto...');
+        res = await fetch('/api/data-tambahan', {
+          method: 'POST',
+          body: formData,
+        });
+        setSubmitProgress('Menyimpan data...');
+      } else {
+        res = await fetch('/api/data-tambahan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            training: training.trim(),
+            nik: nik.trim(),
+            nama: nama.trim(),
+            kd_toko: kdToko.trim(),
+            nama_toko: namaToko.trim(),
+            alasan_tidak_hadir: alasanTidakHadir.trim(),
+          }),
+        });
+      }
 
       const json = await res.json();
       if (res.ok && json.ok) {
@@ -129,14 +207,30 @@ export default function InputTambahanPage() {
         setNama('');
         setKdToko('');
         setNamaToko('');
+        removeSelectedPhoto();
         fetchRecords();
       } else {
-        toast.error(json.error || 'Gagal menyimpan data', { id: toastId });
+        if (json.canSaveWithoutPhoto) {
+          toast.error(
+            'Google Drive cabang belum terhubung, hubungi Admin Pusat.',
+            {
+              id: toastId,
+              duration: 8000,
+              action: {
+                label: 'Simpan Tanpa Foto',
+                onClick: () => handleSubmit(null, true),
+              },
+            }
+          );
+        } else {
+          toast.error(json.error || 'Gagal menyimpan data', { id: toastId });
+        }
       }
     } catch (err) {
       toast.error('Terjadi kesalahan jaringan: ' + err.message, { id: toastId });
     } finally {
       setSaving(false);
+      setSubmitProgress(null);
     }
   }
 

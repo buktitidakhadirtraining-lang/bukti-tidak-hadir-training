@@ -45,13 +45,55 @@ export async function GET(request, { params }) {
 
     const supabase = getSupabaseAdmin();
 
-    const { data: record, error } = await supabase
+    let record = null;
+    let isTambahan = false;
+
+    // 1. Coba cari di absence_records (Input Data Utama)
+    const { data: mainRecord } = await supabase
       .from('absence_records')
       .select('id, nik, nama_peserta, branch_id, drive_file_id, drive_file_name, file_mime_type, branches ( id, name, drive_bridge_url, drive_bridge_secret_enc )')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
-    if (error || !record) {
+    if (mainRecord) {
+      record = mainRecord;
+      isTambahan = false;
+    } else {
+      // 2. Coba cari di data_tambahan (Input Data Tambahan)
+      const { data: tambRecord } = await supabase
+        .from('data_tambahan')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (tambRecord) {
+        let branchData = null;
+        const bId = tambRecord.branch_id || session.branchId;
+        if (bId) {
+          const { data: b } = await supabase
+            .from('branches')
+            .select('id, name, drive_bridge_url, drive_bridge_secret_enc')
+            .eq('id', bId)
+            .maybeSingle();
+          branchData = b;
+        }
+
+        record = {
+          id: tambRecord.id,
+          nik: tambRecord.nik,
+          nama_peserta: tambRecord.nama,
+          branch_id: bId,
+          drive_file_id: tambRecord.foto_drive_file_id || null,
+          drive_file_name: tambRecord.foto_file_name || null,
+          file_mime_type: tambRecord.foto_mime_type || 'image/jpeg',
+          branches: branchData,
+          isTambahan: true,
+        };
+        isTambahan = true;
+      }
+    }
+
+    if (!record) {
       return NextResponse.json({ ok: false, error: 'Data tidak ditemukan', errorCode: '404_NOT_FOUND' }, { status: 404 });
     }
 
@@ -162,13 +204,19 @@ export async function GET(request, { params }) {
     const imageFiles = matchedFiles.filter((f) => {
       const mime = (f.mimeType || '').toLowerCase();
       const name = (f.name || '').toLowerCase();
-      return (
+      const isImg = (
         mime.startsWith('image/') ||
         name.endsWith('.png') ||
         name.endsWith('.jpg') ||
         name.endsWith('.jpeg') ||
         name.endsWith('.webp')
       );
+      if (!isImg) return false;
+      // Untuk record data tambahan, hanya terima file yang memuat '_TB_' agar tidak tertukar dengan foto Berita Acara (BA)
+      if (isTambahan) {
+        return name.includes('_tb_');
+      }
+      return true;
     });
 
     if (imageFiles.length > 0) {
@@ -179,10 +227,10 @@ export async function GET(request, { params }) {
       try {
         const healedGet = await driveGetFile(branch, healedFileId);
         if (healedGet && healedGet.ok && healedGet.base64) {
-          const fileName = newestFile.name || healedGet.name || 'bukti-berita-acara.png';
+          const fileName = newestFile.name || healedGet.name || (isTambahan ? 'bukti-tambahan.jpg' : 'bukti-berita-acara.png');
           let mimeType = newestFile.mimeType || healedGet.mimeType;
           if (!mimeType || mimeType === 'application/octet-stream') {
-            mimeType = guessMimeType(fileName, 'image/png');
+            mimeType = guessMimeType(fileName, 'image/jpeg');
           }
 
           const foundCount = imageFiles.length;
@@ -203,6 +251,8 @@ export async function GET(request, { params }) {
               originalFileId: storedFileId,
               foundCount,
               note,
+              isTambahan,
+              table: isTambahan ? 'data_tambahan' : 'absence_records',
             });
           }
 
@@ -219,6 +269,8 @@ export async function GET(request, { params }) {
               originalFileId: storedFileId,
               foundCount,
               note,
+              isTambahan,
+              table: isTambahan ? 'data_tambahan' : 'absence_records',
               dataUrl: `data:${mimeType};base64,${healedGet.base64}`,
             });
           }
@@ -237,7 +289,9 @@ export async function GET(request, { params }) {
     }
 
     // 3. Jika "find" tidak menemukan file sama sekali
-    const notFoundMsg = 'Foto tidak ada di Drive. Upload ulang melalui Riwayat Data Input.';
+    const notFoundMsg = isTambahan
+      ? 'Foto tidak ada di Drive. Upload ulang melalui Edit Data Tambahan.'
+      : 'Foto tidak ada di Drive. Upload ulang melalui Riwayat Data Input.';
     return NextResponse.json(
       {
         ok: false,
@@ -248,6 +302,8 @@ export async function GET(request, { params }) {
         error: notFoundMsg,
         errorCode: 'NOT_IN_DRIVE',
         isHealed: false,
+        isTambahan,
+        table: isTambahan ? 'data_tambahan' : 'absence_records',
       },
       { status: 404 }
     );

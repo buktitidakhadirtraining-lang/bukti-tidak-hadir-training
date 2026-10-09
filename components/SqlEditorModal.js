@@ -14,9 +14,13 @@ const SQL_MIGRATION_ADD_BRANCH_ID = `-- ========================================
 DROP TRIGGER IF EXISTS trg_absence_records_to_data_tambahan ON public.absence_records;
 DROP FUNCTION IF EXISTS public.fn_auto_record_to_data_tambahan();
 
--- 2. TAMBAH KOLOM PENANDA SUMBER_INPUT
+-- 2. TAMBAH KOLOM PENANDA SUMBER_INPUT & BUKTI FOTO DATA TAMBAHAN
 ALTER TABLE public.absence_records ADD COLUMN IF NOT EXISTS sumber_input TEXT DEFAULT 'input_utama';
 ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS sumber_input TEXT DEFAULT 'input_tambahan';
+ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS foto_drive_file_id TEXT;
+ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS foto_file_name TEXT;
+ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS foto_mime_type TEXT;
+ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS foto_uploaded_at TIMESTAMPTZ;
 
 -- Tandai data lama yang merupakan hasil salinan trigger sebagai 'input_utama'
 UPDATE public.data_tambahan

@@ -46,47 +46,87 @@ export async function POST(request) {
     for (const item of itemsToUpdate) {
       if (!item.id || !item.drive_file_id) continue;
 
-      // Check record ownership
+      // Check record ownership (absence_records or data_tambahan)
       const { data: record, error: findErr } = await supabase
         .from('absence_records')
         .select('id, nik, nama_peserta, branch_id, drive_file_id')
         .eq('id', item.id)
-        .single();
+        .maybeSingle();
 
-      if (findErr || !record) {
-        errors.push(`Record ${item.id} tidak ditemukan`);
-        continue;
-      }
+      if (record) {
+        if (session.role !== 'admin_pusat' && record.branch_id !== session.branchId) {
+          errors.push(`Akses ditolak untuk NIK ${record.nik} (cabang lain)`);
+          continue;
+        }
 
-      if (session.role !== 'admin_pusat' && record.branch_id !== session.branchId) {
-        errors.push(`Akses ditolak untuk NIK ${record.nik} (cabang lain)`);
-        continue;
-      }
+        const updatePayload = {
+          drive_file_id: item.drive_file_id.trim(),
+          updated_at: new Date().toISOString(),
+        };
+        if (item.drive_file_name) {
+          updatePayload.drive_file_name = item.drive_file_name.trim();
+        }
 
-      const updatePayload = {
-        drive_file_id: item.drive_file_id.trim(),
-        updated_at: new Date().toISOString(),
-      };
-      if (item.drive_file_name) {
-        updatePayload.drive_file_name = item.drive_file_name.trim();
-      }
+        const { error: upErr } = await supabase
+          .from('absence_records')
+          .update(updatePayload)
+          .eq('id', item.id);
 
-      const { error: upErr } = await supabase
-        .from('absence_records')
-        .update(updatePayload)
-        .eq('id', item.id);
-
-      if (upErr) {
-        console.error(`[Fix Reference Error for ${record.nik}]:`, upErr);
-        errors.push(`Gagal memperbarui NIK ${record.nik}: ${upErr.message}`);
+        if (upErr) {
+          console.error(`[Fix Reference Error for ${record.nik}]:`, upErr);
+          errors.push(`Gagal memperbarui NIK ${record.nik}: ${upErr.message}`);
+        } else {
+          updatedCount++;
+          await auditLog(session.userId, 'FIX_PHOTO_REFERENCE', {
+            recordId: item.id,
+            nik: record.nik,
+            oldFileId: record.drive_file_id,
+            newFileId: item.drive_file_id,
+          });
+        }
       } else {
-        updatedCount++;
-        await auditLog(session.userId, 'FIX_PHOTO_REFERENCE', {
-          recordId: item.id,
-          nik: record.nik,
-          oldFileId: record.drive_file_id,
-          newFileId: item.drive_file_id,
-        });
+        // Cek tabel data_tambahan
+        const { data: tambRecord } = await supabase
+          .from('data_tambahan')
+          .select('id, nik, nama, branch_id, foto_drive_file_id')
+          .eq('id', item.id)
+          .maybeSingle();
+
+        if (tambRecord) {
+          if (session.role !== 'admin_pusat' && tambRecord.branch_id && tambRecord.branch_id !== session.branchId) {
+            errors.push(`Akses ditolak untuk NIK ${tambRecord.nik} (cabang lain)`);
+            continue;
+          }
+
+          const tambPayload = {
+            foto_drive_file_id: item.drive_file_id.trim(),
+            updated_at: new Date().toISOString(),
+          };
+          if (item.drive_file_name) {
+            tambPayload.foto_file_name = item.drive_file_name.trim();
+          }
+
+          const { error: tambErr } = await supabase
+            .from('data_tambahan')
+            .update(tambPayload)
+            .eq('id', item.id);
+
+          if (tambErr) {
+            console.error(`[Fix Reference Tambahan Error for ${tambRecord.nik}]:`, tambErr);
+            errors.push(`Gagal memperbarui NIK ${tambRecord.nik}: ${tambErr.message}`);
+          } else {
+            updatedCount++;
+            await auditLog(session.userId, 'FIX_PHOTO_REFERENCE_TAMBAHAN', {
+              recordId: item.id,
+              nik: tambRecord.nik,
+              oldFileId: tambRecord.foto_drive_file_id,
+              newFileId: item.drive_file_id,
+            });
+          }
+        } else {
+          errors.push(`Record ${item.id} tidak ditemukan`);
+          continue;
+        }
       }
     }
 
