@@ -130,18 +130,6 @@ export default function InputPage() {
     }
   }
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <FileValidationModal 
-        isOpen={showValidationModal} 
-        onClose={() => {setShowValidationModal(false); setValidationErrors([]);}} 
-        errors={validationErrors} 
-      />
-      {/* Header */}
-      {/* ... rest of the page ... */}
-    </div>
-  );
-
   async function handleSubmit(e) {
     e.preventDefault();
 
