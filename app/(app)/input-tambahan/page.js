@@ -463,6 +463,123 @@ export default function InputTambahanPage() {
             </div>
           </div>
 
+          {/* Bukti Foto (Opsional) */}
+          <div className="space-y-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-gray-700 uppercase tracking-wider">
+                Bukti Foto <span className="font-normal text-gray-500 text-[11px]">(Opsional &bull; Disarankan melampirkan bukti foto)</span>
+              </label>
+            </div>
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOver(true);
+              }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                if (e.dataTransfer.files?.[0]) {
+                  handleFileSelect(e.dataTransfer.files[0]);
+                }
+              }}
+              onClick={() => {
+                if (!selectedFile && !compressing) fileInputRef.current?.click();
+              }}
+              className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all ${
+                isDragOver
+                  ? 'border-[#0056b3] bg-blue-50/50'
+                  : selectedFile
+                  ? 'border-teal-300 bg-teal-50/30'
+                  : 'border-gray-300 hover:border-gray-400 bg-gray-50/50 cursor-pointer'
+              }`}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    handleFileSelect(e.target.files[0]);
+                  }
+                }}
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+              />
+
+              {compressing ? (
+                <div className="py-6 flex flex-col items-center justify-center gap-2 text-[#0056b3]">
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                  <p className="text-xs font-bold">Mengompresi foto & menyesuaikan orientasi EXIF...</p>
+                  <p className="text-[11px] text-gray-500">Maks. sisi 1600px &bull; JPEG kualitas 0.7</p>
+                </div>
+              ) : selectedFile ? (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {previewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={previewUrl}
+                        alt="Pratinjau"
+                        className="w-14 h-14 object-cover rounded-xl border border-gray-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                        <FileCheck className="w-7 h-7" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+                        {selectedFile.name}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-teal-100 text-teal-800">
+                          {fileStats?.sizeSummary || formatBytes(selectedFile.size)}
+                        </span>
+                        <span className="text-[11px] text-gray-500">
+                          &bull; Siap diunggah ke Google Drive cabang
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors"
+                    >
+                      Ganti
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeSelectedPhoto();
+                      }}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                      title="Hapus berkas terpilih"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-4">
+                  <UploadCloud className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-gray-700">
+                    Tarik dan lepas bukti foto di sini, atau <span className="text-[#0056b3]">pilih file (JPG, PNG, WEBP)</span>
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Maksimal 5 MB. Foto otomatis dikompres di browser sebelum diunggah ke Google Drive cabang.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
             <p className="text-[11px] text-gray-500 italic">
               * Data yang Anda input langsung tersimpan aman di database cabang Anda.
@@ -475,7 +592,7 @@ export default function InputTambahanPage() {
               {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Menyimpan...</span>
+                  <span>{submitProgress || 'Menyimpan...'}</span>
                 </>
               ) : (
                 <>
@@ -546,6 +663,7 @@ export default function InputTambahanPage() {
                 <th className="p-3 text-center w-24">KD TOKO</th>
                 <th className="p-3 w-36">NAMA TOKO</th>
                 <th className="p-3 w-40">ALASAN TIDAK HADIR</th>
+                <th className="p-3 text-center w-28">FOTO</th>
                 <th className="p-3 text-center w-24">AKSI</th>
               </tr>
             </thead>
@@ -561,12 +679,26 @@ export default function InputTambahanPage() {
                     <td className="p-3 uppercase text-gray-700">{r.nama_toko || '-'}</td>
                     <td className="p-3 text-gray-700">{r.alasan_tidak_hadir || '-'}</td>
                     <td className="p-3 text-center">
+                      {r.foto_drive_file_id ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewingPhotoRecord(r)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#0056b3] rounded-lg text-[11px] font-bold border border-blue-200 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>Lihat Foto</span>
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-[11px] italic">Tanpa foto</span>
+                      )}
+                    </td>
+                    <td className="p-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         {/* Tombol Edit */}
                         <button
                           type="button"
                           onClick={() => setEditingRecord(r)}
-                          className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                           title="Edit baris data ini"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -575,7 +707,7 @@ export default function InputTambahanPage() {
                         <button
                           type="button"
                           onClick={() => setDeleteSingleDialog({ isOpen: true, record: r, loading: false })}
-                          className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                           title="Hapus baris data ini"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -586,7 +718,7 @@ export default function InputTambahanPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-gray-400 italic">
+                  <td colSpan={9} className="p-8 text-center text-gray-400 italic">
                     {loadingList ? 'Memuat data...' : 'Belum ada data tambahan yang tercatat di cabang Anda.'}
                   </td>
                 </tr>
@@ -595,6 +727,47 @@ export default function InputTambahanPage() {
           </table>
         </div>
       </div>
+
+      {/* Modal Pratinjau Foto */}
+      {viewingPhotoRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-xl w-full p-6 space-y-4 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 font-title">
+                  Pratinjau Bukti Foto - {viewingPhotoRecord.nama}
+                </h3>
+                <p className="text-xs text-gray-500 font-mono">NIK: {viewingPhotoRecord.nik} &bull; {viewingPhotoRecord.training}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingPhotoRecord(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="w-full h-80 flex items-center justify-center bg-gray-50 rounded-xl border border-gray-200 overflow-hidden relative">
+              <ProofImageDisplay
+                record={{ id: viewingPhotoRecord.id, drive_file_id: viewingPhotoRecord.foto_drive_file_id }}
+                alt={`Bukti ${viewingPhotoRecord.nama}`}
+                maxHeight="300px"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setViewingPhotoRecord(null)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Edit Data Tambahan */}
       <EditDataTambahanModal
@@ -623,7 +796,7 @@ export default function InputTambahanPage() {
       <ConfirmDialog
         isOpen={deleteSingleDialog.isOpen}
         title="Hapus Data Tambahan"
-        message={`Apakah Anda yakin ingin menghapus data peserta "${deleteSingleDialog.record?.nama}" (NIK: ${deleteSingleDialog.record?.nik})?`}
+        message={`Apakah Anda yakin ingin menghapus data peserta "${deleteSingleDialog.record?.nama}" (NIK: ${deleteSingleDialog.record?.nik}) beserta fotonya di Google Drive?`}
         confirmText="Hapus Data"
         cancelText="Batal"
         isDanger={true}
@@ -636,7 +809,7 @@ export default function InputTambahanPage() {
       <ConfirmDialog
         isOpen={deleteAllDialog.isOpen}
         title="Hapus Semua Data Tambahan"
-        message={`PERINGATAN: Tindakan ini akan menghapus seluruh (${records.length}) data tambahan cabang Anda. Apakah Anda yakin?`}
+        message={`PERINGATAN: Tindakan ini akan menghapus seluruh (${records.length}) data tambahan cabang Anda beserta seluruh foto terkait di Google Drive (dipindah ke Sampah). Apakah Anda yakin?`}
         confirmText="Hapus Semua Data"
         cancelText="Batal"
         isDanger={true}
