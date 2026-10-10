@@ -238,6 +238,11 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+    
+    // Server-side validation
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+       return NextResponse.json({ ok: false, error: 'Format file tidak sesuai. Hanya JPG, JPEG, dan PNG yang diperbolehkan.' }, { status: 415 });
+    }
 
     // Validasi format NIK (hanya angka, 8-16 digit)
     if (!/^\d{8,16}$/.test(nik)) {

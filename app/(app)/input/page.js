@@ -21,7 +21,9 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { MAX_FILE_SIZE_BYTES, POSITIONS } from '../../../lib/config.js';
-import { compressImage, processPdfFile, formatBytes } from '../../../lib/compress.js';
+import { compressImage, formatBytes } from '../../../lib/compress.js';
+import { validateImageFile } from '../../../lib/image-validator.js';
+import FileValidationModal from '../../../components/FileValidationModal.js';
 
 export default function InputPage() {
   const router = useRouter();
@@ -30,6 +32,8 @@ export default function InputPage() {
   const [meta, setMeta] = useState(null);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [showValidationModal, setShowValidationModal] = useState(false);
 
   // Form State
   const [nik, setNik] = useState('');
@@ -84,37 +88,14 @@ export default function InputPage() {
   async function handleFileChange(file) {
     if (!file) return;
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Format berkas tidak didukung. Harap pilih gambar (JPG/PNG/WebP) atau PDF.');
+    const validation = await validateImageFile(file);
+    if (!validation.valid) {
+      setValidationErrors([validation.message]);
+      setShowValidationModal(true);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    // PDF: tidak dikompres, tolak jika lebih dari 1 MB (1 * 1024 * 1024 bytes)
-    if (file.type === 'application/pdf') {
-      const ONE_MB = 1 * 1024 * 1024;
-      if (file.size > ONE_MB) {
-        toast.error(
-          `Ukuran dokumen PDF melebihi 1 MB (${formatBytes(file.size)}). Dokumen PDF tidak dikompresi, silakan perkecil dokumen terlebih dahulu.`
-        );
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
-      }
-
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setSelectedFile(file);
-      setFileStats({
-        originalSize: file.size,
-        compressedSize: file.size,
-        sizeSummary: formatBytes(file.size),
-        isPdf: true,
-      });
-      setPreviewUrl(null);
-      toast.success(`Dokumen PDF siap (${formatBytes(file.size)})`);
-      return;
-    }
-
-    // Foto: kompres otomatis di browser (EXIF from-image, max side 1280px, canvas JPEG 0.7)
     setCompressing(true);
     try {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -148,6 +129,18 @@ export default function InputPage() {
       fileInputRef.current.value = '';
     }
   }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <FileValidationModal 
+        isOpen={showValidationModal} 
+        onClose={() => {setShowValidationModal(false); setValidationErrors([]);}} 
+        errors={validationErrors} 
+      />
+      {/* Header */}
+      {/* ... rest of the page ... */}
+    </div>
+  );
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -234,6 +227,11 @@ export default function InputPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      <FileValidationModal 
+        isOpen={showValidationModal} 
+        onClose={() => {setShowValidationModal(false); setValidationErrors([]);}} 
+        errors={validationErrors} 
+      />
       {/* Header */}
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-100 shadow-soft flex items-center justify-between">
         <div>
@@ -489,9 +487,9 @@ export default function InputPage() {
                 <UploadCloud className="w-4 h-4" />
                 3. Bukti Berita Acara (Google Drive) <span className="text-red-500">*</span>
               </h3>
-              <span className="text-[11px] text-gray-500 font-medium">
-                Wajib diunggah • PDF maks. 1 MB • Foto dikompres otomatis
-              </span>
+              <p className="text-[11px] text-gray-500 font-medium">
+                Wajib diunggah • Hanya JPG, JPEG, PNG • Foto dikompres otomatis
+              </p>
             </div>
 
             <div
@@ -526,7 +524,7 @@ export default function InputPage() {
                     handleFileChange(e.target.files[0]);
                   }
                 }}
-                accept="image/jpeg,image/png,image/webp,application/pdf"
+                accept="image/jpeg,image/png"
                 className="hidden"
               />
 
