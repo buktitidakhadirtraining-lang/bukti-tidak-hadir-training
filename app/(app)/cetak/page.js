@@ -186,12 +186,16 @@ export default function CetakPage() {
     const map = new Map();
     (records || []).forEach((r) => {
       const tId = r.training_id;
-      const tName = r.training_types?.name;
+      const tName = (r.training_types?.name || r.training || '').trim().toUpperCase();
       if (tId) map.set(tId, (map.get(tId) || 0) + 1);
       if (tName) map.set(tName, (map.get(tName) || 0) + 1);
+      const masterT = meta?.trainings?.find(t => t.name.trim().toUpperCase().replace(/\s+/g, ' ') === tName.replace(/\s+/g, ' '));
+      if (masterT) {
+        map.set(masterT.id, (map.get(masterT.id) || 0) + 1);
+      }
     });
     return map;
-  }, [records]);
+  }, [records, meta]);
 
   // Record yang difilter untuk format horizontal
   const filteredHorizontalRecords = useMemo(() => {
@@ -199,12 +203,29 @@ export default function CetakPage() {
     if (selectedHorizontalTrainingIds.length === 0) return [];
     return records.filter((r) => {
       const tId = r.training_id;
-      const tName = r.training_types?.name;
-      return selectedHorizontalTrainingIds.some(
-        (id) => id === tId || meta?.trainings?.find((t) => t.id === id)?.name === tName
-      );
+      const tName = (r.training_types?.name || r.training || '').trim().toUpperCase().replace(/\s+/g, ' ');
+      return selectedHorizontalTrainingIds.some((id) => {
+        if (id === tId) return true;
+        const masterT = meta?.trainings?.find((t) => t.id === id);
+        if (masterT && masterT.name.trim().toUpperCase().replace(/\s+/g, ' ') === tName) {
+          return true;
+        }
+        return false;
+      });
     });
   }, [records, printFormat, selectedHorizontalTrainingIds, meta]);
+
+  const inputUtamaCount = useMemo(() => {
+    return (records || []).filter(r => !r.isTambahan && r.sumber_input !== 'input_utama').length;
+  }, [records]);
+
+  const inputTambahanCount = useMemo(() => {
+    return (records || []).filter(r => r.isTambahan || r.sumber_input === 'input_utama').length;
+  }, [records]);
+
+  const inputTambahanWithPhotoCount = useMemo(() => {
+    return (records || []).filter(r => (r.isTambahan || r.sumber_input === 'input_utama') && r.drive_file_id).length;
+  }, [records]);
 
   // Helper toggle dan aksi tombol multi-select
   const toggleTrainingSelection = (id) => {
@@ -1669,12 +1690,37 @@ export default function CetakPage() {
   const trainingGroups = useMemo(() => {
     const recordsToGroup = printFormat === 'horizontal' ? filteredHorizontalRecords : records;
     const groups = recordsToGroup.reduce((acc, r) => {
-      const tId = r.training_id || 'unassigned';
-      const tName = r.training_types?.name || 'Tanpa Jenis Training';
-      if (!acc[tId]) {
-        acc[tId] = { id: tId, name: tName, records: [] };
+      const tId = r.training_id || r.training_types?.id;
+      const tName = (r.training_types?.name || r.training || 'Tanpa Jenis Training').trim();
+
+      let masterT = meta?.trainings?.find((t) => {
+        if (tId && t.id === tId) return true;
+        return t.name.trim().toUpperCase().replace(/\s+/g, ' ') === tName.toUpperCase().replace(/\s+/g, ' ');
+      });
+
+      const groupKey = masterT ? masterT.id : tName.toUpperCase().replace(/\s+/g, '_');
+      const groupName = masterT ? masterT.name : (tName ? tName.toUpperCase() + ' (belum terpetakan)' : 'Tanpa Jenis Training');
+
+      if (!acc[groupKey]) {
+        acc[groupKey] = { id: groupKey, name: groupName, records: [], utamaRecords: [], tambahanRecords: [] };
       }
-      acc[tId].records.push(r);
+      if (r.isTambahan || r.sumber_input === 'input_utama') {
+        acc[groupKey].tambahanRecords.push(r);
+      } else {
+        acc[groupKey].utamaRecords.push(r);
+      }
+
+      const utamaNiks = new Set(acc[groupKey].utamaRecords.map(u => String(u.nik || '').trim()));
+      acc[groupKey].tambahanRecords.forEach(t => {
+        const nikStr = String(t.nik || '').trim();
+        if (utamaNiks.has(nikStr)) {
+          t.nikDuplicateNote = `NIK ${nikStr} ada di Input Data dan Input Data Tambahan`;
+        } else {
+          t.nikDuplicateNote = null;
+        }
+      });
+
+      acc[groupKey].records = [...acc[groupKey].utamaRecords, ...acc[groupKey].tambahanRecords];
       return acc;
     }, {});
 
@@ -1901,7 +1947,12 @@ export default function CetakPage() {
               <span>Total: <strong className="text-gray-800">{listTidakHadirData.length}</strong> peserta tidak hadir</span>
             )}
             {(printFormat === 'horizontal' || printFormat === 'lama') && (
-              <span>Menampilkan: <strong className="text-gray-800">{printFormat === 'horizontal' ? filteredHorizontalRecords.length : records.length}</strong> data</span>
+              <div className="space-y-0.5">
+                <span>Menampilkan: <strong className="text-gray-800">{printFormat === 'horizontal' ? filteredHorizontalRecords.length : records.length}</strong> data</span>
+                <p className="text-[11px] text-gray-500">
+                  Input Data: {inputUtamaCount}, Input Data Tambahan: {inputTambahanCount} (dengan foto: {inputTambahanWithPhotoCount})
+                </p>
+              </div>
             )}
           </div>
         </div>

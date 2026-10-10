@@ -117,14 +117,69 @@ export async function GET(request) {
       return NextResponse.json({ ok: false, error: 'Gagal mengambil data ketidakhadiran' }, { status: 500 });
     }
 
+    // Ambil juga data dari data_tambahan agar tampil di Cetak Bukti PDF
+    let tambahanQuery = supabase.from('data_tambahan').select('*');
+    if (session.role !== 'admin_pusat') {
+      tambahanQuery = tambahanQuery.eq('branch_id', session.branchId);
+    } else if (branchId) {
+      tambahanQuery = tambahanQuery.eq('branch_id', branchId);
+    }
+    if (year) {
+      if (month) {
+        const m = String(month).padStart(2, '0');
+        const startDate = `${year}-${m}-01`;
+        const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+        const endDate = `${year}-${m}-${String(lastDay).padStart(2, '0')}`;
+        tambahanQuery = tambahanQuery.gte('created_at', startDate).lte('created_at', endDate + 'T23:59:59Z');
+      } else {
+        tambahanQuery = tambahanQuery.gte('created_at', `${year}-01-01T00:00:00Z`).lte('created_at', `${year}-12-31T23:59:59Z`);
+      }
+    }
+    if (search && search.trim()) {
+      const cleanSearch = search.replace(/[,()%\\]/g, '').trim();
+      if (cleanSearch) {
+        tambahanQuery = tambahanQuery.or(`nik.ilike.%${cleanSearch}%,nama.ilike.%${cleanSearch}%`);
+      }
+    }
+    const { data: tambahanData } = await tambahanQuery;
+    const cleanTambahan = (tambahanData || []).filter(
+      (r) => r.sumber_input !== 'input_utama' && !r.source_record_id
+    );
+    const mappedTambahan = cleanTambahan.map((item) => ({
+      id: item.id,
+      nik: item.nik,
+      nama_peserta: item.nama,
+      jabatan: '-',
+      batch: null,
+      tanggal_pelaksanaan: item.created_at,
+      keterangan: item.alasan_tidak_hadir,
+      drive_file_id: item.foto_drive_file_id,
+      drive_file_name: item.foto_file_name,
+      drive_file_url: null,
+      file_mime_type: item.foto_mime_type,
+      file_size_bytes: null,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+      branch_id: item.branch_id,
+      training_id: item.training_id || null,
+      alasan_id: null,
+      branches: null,
+      training_types: { id: null, name: item.training },
+      absence_reasons: { id: null, name: item.alasan_tidak_hadir },
+      isTambahan: true,
+    }));
+
+    const combinedData = [...(data || []), ...mappedTambahan];
+    const totalCombinedCount = (count || 0) + mappedTambahan.length;
+
     return NextResponse.json({
       ok: true,
-      data: data || [],
+      data: combinedData,
       pagination: {
-        total: count || 0,
+        total: totalCombinedCount,
         page,
         limit,
-        totalPages: Math.ceil((count || 0) / limit),
+        totalPages: Math.ceil(totalCombinedCount / limit),
       },
     });
   } catch (err) {
