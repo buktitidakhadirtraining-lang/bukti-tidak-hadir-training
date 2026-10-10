@@ -120,7 +120,11 @@ CREATE POLICY "Delete list_soft_skill per cabang" ON public.list_soft_skill
     FOR DELETE USING (true);
 
 
--- 3. TABEL: ttd_cabang (Menyimpan Tanda Tangan Resmi per Cabang & Peran / Paket)
+-- 4. TABEL: training_types (Pastikan kolom sort_order ada)
+ALTER TABLE public.training_types ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+-- 5. TABEL: absence_reasons (Pastikan kolom sort_order ada)
+ALTER TABLE public.absence_reasons ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
 CREATE TABLE IF NOT EXISTS public.ttd_cabang (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cabang TEXT NOT NULL,

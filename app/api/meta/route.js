@@ -22,7 +22,7 @@ export async function GET(request) {
         .select('id, name, code, is_active, drive_bridge_url, drive_bridge_secret_enc')
         .eq('is_active', true)
         .order('name'),
-      supabase.from('training_types').select('id, name, is_active').eq('is_active', true).order('name'),
+      supabase.from('training_types').select('id, name, is_active, sort_order').eq('is_active', true).order('sort_order'),
       supabase.from('absence_reasons').select('id, name, is_active').eq('is_active', true).order('name'),
     ]);
 
