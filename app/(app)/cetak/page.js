@@ -200,18 +200,21 @@ export default function CetakPage() {
   // Record yang difilter untuk format horizontal
   const filteredHorizontalRecords = useMemo(() => {
     if (printFormat !== 'horizontal') return records;
-    if (selectedHorizontalTrainingIds.length === 0) return [];
     return records.filter((r) => {
       const tId = r.training_id;
       const tName = (r.training_types?.name || r.training || '').trim().toUpperCase().replace(/\s+/g, ' ');
-      return selectedHorizontalTrainingIds.some((id) => {
-        if (id === tId) return true;
-        const masterT = meta?.trainings?.find((t) => t.id === id);
-        if (masterT && masterT.name.trim().toUpperCase().replace(/\s+/g, ' ') === tName) {
-          return true;
-        }
-        return false;
+      const masterT = meta?.trainings?.find((t) => {
+        if (tId && t.id === tId) return true;
+        return t.name.trim().toUpperCase().replace(/\s+/g, ' ') === tName;
       });
+
+      if (!masterT) {
+        // Belum terpetakan ke Master -> tampilkan agar tidak hilang diam-diam
+        return true;
+      }
+
+      if (selectedHorizontalTrainingIds.length === 0) return false;
+      return selectedHorizontalTrainingIds.includes(masterT.id);
     });
   }, [records, printFormat, selectedHorizontalTrainingIds, meta]);
 
@@ -2842,10 +2845,15 @@ export default function CetakPage() {
         </div>
       )}
 
-      {/* Panel Status & Peringatan Foto Bukti (Self-Healing & Fix Reference) */}
-      {(failedPhotosList.length > 0 || healedPhotosList.length > 0 || isPhotoCheckModalOpen) && (
-        <div className="no-print max-w-4xl mx-auto mb-4 space-y-3">
-          {/* A. Banner Foto Dipulihkan (Self-Healing Active) */}
+      {/* Panel Informasi & Peringatan Foto Bukti (Self-Healing & Fix Reference) */}
+      <div className="no-print max-w-4xl mx-auto mb-4 space-y-3">
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 font-medium">
+          ℹ️ Input Data: {inputUtamaCount}, Input Data Tambahan: {inputTambahanCount} (dengan foto: {inputTambahanWithPhotoCount})
+        </div>
+
+        {(failedPhotosList.length > 0 || healedPhotosList.length > 0 || isPhotoCheckModalOpen) && (
+          <div className="space-y-3">
+            {/* A. Banner Foto Dipulihkan (Self-Healing Active) */}
           {healedPhotosList.length > 0 && (
             <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl shadow-xs text-xs text-emerald-950">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-emerald-200">
@@ -2981,8 +2989,9 @@ export default function CetakPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* ========================================================================= */}
       {/* 1. FORMAT: BERITA ACARA REKAPITULASI (GAMBAR 2 & GAMBAR 3)                 */}
