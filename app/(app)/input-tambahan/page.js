@@ -24,6 +24,8 @@ import {
 import { toast } from 'sonner';
 import { MASTER_TRAININGS_LIST } from '../../../lib/trainings-master.js';
 import { compressImage, formatBytes } from '../../../lib/compress.js';
+import { validateImageFile } from '../../../lib/image-validator.js';
+import FileValidationModal from '../../../components/FileValidationModal.js';
 import EditDataTambahanModal from '../../../components/EditDataTambahanModal.js';
 import ImportExportModal from '../../../components/ImportExportModal.js';
 import ConfirmDialog from '../../../components/ConfirmDialog.js';
@@ -55,6 +57,8 @@ export default function InputTambahanPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [meta, setMeta] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [showValidationModal, setShowValidationModal] = useState(false);
 
   // Modals
   const [showImportExportModal, setShowImportExportModal] = useState(false);
@@ -115,9 +119,10 @@ export default function InputTambahanPage() {
   async function handleFileSelect(file) {
     if (!file) return;
 
-    const MAX_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      toast.error(`Ukuran file melebihi batas maksimal 5 MB (${formatBytes(file.size)}). Harap pilih foto lain.`);
+    const validation = await validateImageFile(file);
+    if (!validation.valid) {
+      setValidationErrors([validation.message]);
+      setShowValidationModal(true);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -296,6 +301,11 @@ export default function InputTambahanPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
+      <FileValidationModal 
+        isOpen={showValidationModal} 
+        onClose={() => {setShowValidationModal(false); setValidationErrors([]);}} 
+        errors={validationErrors} 
+      />
       {/* Header Info */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-soft">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -502,7 +512,7 @@ export default function InputTambahanPage() {
                     handleFileSelect(e.target.files[0]);
                   }
                 }}
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
                 className="hidden"
               />
 
