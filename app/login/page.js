@@ -115,7 +115,7 @@ export default function LoginPage() {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Contoh: admin.pusat atau admin.sby"
+                  placeholder=""
                   className="w-full pl-10 pr-4 py-3 text-sm bg-gray-50/50 border border-gray-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#0056b3] focus:border-transparent transition-all min-h-[46px]"
                 />
               </div>
@@ -165,42 +165,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Helper Petunjuk Akun Login */}
-          <div className="mt-6 pt-5 border-t border-gray-100">
-            <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider text-center">
-              Daftar Akun Pengguna:
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setUsername('admin.pusat');
-                  setPassword('Admin123!');
-                  setErrorMessage('');
-                }}
-                className="p-2 bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200/80 rounded-xl text-left transition-all"
-              >
-                <span className="font-bold text-[#0056b3] block">Admin Pusat</span>
-                <span className="text-gray-600 block text-[11px]">admin.pusat</span>
-                <span className="text-gray-400 block text-[10px]">Pass: Admin123!</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setUsername('admin.sby');
-                  setPassword('Admin123!');
-                  setErrorMessage('');
-                }}
-                className="p-2 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-xl text-left transition-all"
-              >
-                <span className="font-bold text-emerald-800 block">Admin Surabaya</span>
-                <span className="text-gray-600 block text-[11px]">admin.sby</span>
-                <span className="text-gray-400 block text-[10px]">Pass: Admin123!</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
