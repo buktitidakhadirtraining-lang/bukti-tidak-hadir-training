@@ -312,8 +312,8 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
                     <div>
                       <span className="font-bold">Jabatan lama terdeteksi:</span>
                       <p className="mt-0.5 text-amber-700">
-                        Nilai <strong>&quot;{jabatan}&quot;</strong> sudah tidak berlaku dalam standar 5 jabatan resmi.
-                        Sebaiknya pilih ulang salah satu dari 5 jabatan baru yang sesuai di atas.
+                        Nilai <strong>&quot;{jabatan}&quot;</strong> sudah tidak berlaku dalam standar jabatan resmi.
+                        Sebaiknya pilih ulang salah satu dari jabatan resmi yang sesuai di atas.
                       </p>
                     </div>
                   </div>
