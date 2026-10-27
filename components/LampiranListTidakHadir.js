@@ -16,7 +16,13 @@ function chunkArray(arr, size = 20) {
 export default function LampiranListTidakHadir({
   data = [],
   selectedTraining = '', // '' berarti semua training
+  nomorSurat = '',
+  kodeDokumen = '',
 }) {
+  const formattedNomorSurat = nomorSurat && nomorSurat.trim()
+    ? (/^nomor\s*:/i.test(nomorSurat.trim()) ? nomorSurat.trim() : `Nomor: ${nomorSurat.trim()}`)
+    : '';
+
   // 1. Kelompokkan data per jenis training & deduplikasi peserta berdasarkan (training + NIK)
   const groupedData = useMemo(() => {
     const groups = {};
@@ -133,6 +139,32 @@ export default function LampiranListTidakHadir({
           >
             {/* Header Lembar A4 (Selalu diulang di setiap halaman) */}
             <div className="sheet-header text-center" style={{ marginBottom: '0' }}>
+              {kodeDokumen && kodeDokumen.trim() ? (
+                <div
+                  style={{
+                    fontFamily: 'Arial, Helvetica, sans-serif',
+                    fontSize: '10pt',
+                    textAlign: 'center',
+                    marginBottom: '2mm',
+                    color: '#000000',
+                  }}
+                >
+                  {kodeDokumen.trim()}
+                </div>
+              ) : null}
+              {formattedNomorSurat ? (
+                <div
+                  style={{
+                    fontFamily: 'Arial, Helvetica, sans-serif',
+                    fontSize: '10pt',
+                    textAlign: 'left',
+                    marginBottom: '2mm',
+                    color: '#000000',
+                  }}
+                >
+                  {formattedNomorSurat}
+                </div>
+              ) : null}
               <h1
                 style={{
                   fontFamily: 'Arial, Helvetica, sans-serif',

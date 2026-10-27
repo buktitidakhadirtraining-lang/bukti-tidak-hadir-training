@@ -11,12 +11,31 @@ export default function BeritaAcaraRekap({
   bulan = 'Oktober',
   tahun = '2026',
   ttdImages = {}, // { dbm_operasional: dataUrl, dbm_admin: dataUrl, hrd_manager: dataUrl, tc_supervisor: dataUrl }
+  nomorSurat = '',
+  kodeDokumen = '',
 }) {
+  const formattedNomorSurat = nomorSurat && nomorSurat.trim()
+    ? (/^nomor\s*:/i.test(nomorSurat.trim()) ? nomorSurat.trim() : `Nomor: ${nomorSurat.trim()}`)
+    : '';
+
   return (
     <div
       className="sheet text-xs leading-relaxed"
       style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
     >
+      {/* Header Kode Dokumen & Nomor Berita Acara */}
+      {kodeDokumen && kodeDokumen.trim() ? (
+        <div className="text-center font-normal text-xs sm:text-sm tracking-wide mb-3 text-black">
+          {kodeDokumen.trim()}
+        </div>
+      ) : null}
+
+      {formattedNomorSurat ? (
+        <div className="text-left font-normal text-xs sm:text-sm mb-2 text-black">
+          {formattedNomorSurat}
+        </div>
+      ) : null}
+
       {/* 1. Header Judul Berita Acara */}
       <div className="text-center space-y-0.5 mb-4">
         <h1 className="text-base sm:text-lg font-bold tracking-wide uppercase leading-tight">

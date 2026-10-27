@@ -96,6 +96,40 @@ export default function CetakPage() {
   // Pengaturan Lampiran List Tidak Hadir (Gambar 4 & 5)
   const [selectedTrainingListFilter, setSelectedTrainingListFilter] = useState('');
 
+  // Pengaturan Nomor Surat / Berita Acara & Kode Dokumen Cetak
+  const [nomorSurat, setNomorSurat] = useState('');
+  const [kodeDokumen, setKodeDokumen] = useState('');
+
+  // Sinkronisasi nomor surat & kode dokumen dengan localStorage
+  useEffect(() => {
+    try {
+      const savedNomor = localStorage.getItem('cetak_nomor_surat');
+      if (savedNomor) setNomorSurat(savedNomor);
+      const savedKode = localStorage.getItem('cetak_kode_dokumen');
+      if (savedKode) setKodeDokumen(savedKode);
+    } catch (_) {}
+  }, []);
+
+  const handleNomorSuratChange = (val) => {
+    setNomorSurat(val);
+    try {
+      localStorage.setItem('cetak_nomor_surat', val);
+    } catch (_) {}
+  };
+
+  const handleKodeDokumenChange = (val) => {
+    setKodeDokumen(val);
+    try {
+      localStorage.setItem('cetak_kode_dokumen', val);
+    } catch (_) {}
+  };
+
+  const formattedNomorSurat = useMemo(() => {
+    if (!nomorSurat || !nomorSurat.trim()) return '';
+    const trimmed = nomorSurat.trim();
+    return /^nomor\s*:/i.test(trimmed) ? trimmed : `Nomor: ${trimmed}`;
+  }, [nomorSurat]);
+
   // Status Sinkronisasi Live Time 10 Detik
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -345,6 +379,12 @@ export default function CetakPage() {
           ...DEFAULT_SOFT_SKILL_SIGNERS,
           ...json.data,
         });
+        if (json.data.nomor_surat && !localStorage.getItem('cetak_nomor_surat')) {
+          setNomorSurat(json.data.nomor_surat);
+        }
+        if (json.data.kode_dokumen && !localStorage.getItem('cetak_kode_dokumen')) {
+          setKodeDokumen(json.data.kode_dokumen);
+        }
       }
     } catch (e) {
       console.error('[fetchSignerConfig error]:', e);
@@ -370,7 +410,11 @@ export default function CetakPage() {
         body: JSON.stringify({
           jenis: 'soft_skill',
           branch_id: branchId || undefined,
-          data: softSkillSignerConfig,
+          data: {
+            ...softSkillSignerConfig,
+            nomor_surat: nomorSurat,
+            kode_dokumen: kodeDokumen,
+          },
         }),
       });
       const json = await res.json();
@@ -928,12 +972,16 @@ export default function CetakPage() {
               item.alasan_tidak_hadir,
             ]);
 
+            const hasKode = Boolean(kodeDokumen && kodeDokumen.trim());
+            const hasNomor = Boolean(formattedNomorSurat);
+            const extraTop = (hasKode ? 6 : 0) + (hasNomor ? 5 : 0);
+
             autoTable(doc, {
-              startY: 31,
+              startY: 31 + extraTop,
               head: [['NO', 'TRAINING', 'NIK', 'NAMA', 'KD TOKO', 'NAMA TOKO', 'ALASAN TIDAK HADIR']],
               body: tableRows,
               theme: 'grid',
-              margin: { left: 12, right: 12, top: 31, bottom: 20 },
+              margin: { left: 12, right: 12, top: 31 + extraTop, bottom: 20 },
               styles: {
                 font: 'helvetica',
                 fontSize: 9,
@@ -964,14 +1012,30 @@ export default function CetakPage() {
                 6: { halign: 'left', cellWidth: 26 },
               },
               didDrawPage: function () {
+                let hY = 14;
+                if (hasKode) {
+                  doc.setFont('helvetica', 'normal');
+                  doc.setFontSize(10);
+                  doc.setTextColor(0, 0, 0);
+                  doc.text(kodeDokumen.trim(), 105, hY, { align: 'center' });
+                  hY += 6;
+                }
+                if (hasNomor) {
+                  doc.setFont('helvetica', 'normal');
+                  doc.setFontSize(10);
+                  doc.setTextColor(0, 0, 0);
+                  doc.text(formattedNomorSurat, 12, hY, { align: 'left' });
+                  hY += 5;
+                }
+
                 // Judul & Subjudul Utama (Diulang di tiap lembar)
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(15);
                 doc.setTextColor(0, 0, 0);
-                doc.text('LAMPIRAN DETAIL PESERTA TIDAK HADIR', 105, 18, { align: 'center' });
+                doc.text('LAMPIRAN DETAIL PESERTA TIDAK HADIR', 105, hY + 4, { align: 'center' });
 
                 doc.setFontSize(12);
-                doc.text(`JENIS TRAINING: ${groupKey}`, 105, 25, { align: 'center' });
+                doc.text(`JENIS TRAINING: ${groupKey}`, 105, hY + 11, { align: 'center' });
 
                 // Footer Lembar
                 const pageY = 284;
@@ -1015,20 +1079,38 @@ export default function CetakPage() {
         const filename = `Berita_Acara_Rekapitulasi_Training_${bulanCetak}_${tahunCetak}_${ttdMode}.pdf`;
 
         // Header Judul
+        let currentY = 16;
+        if (kodeDokumen && kodeDokumen.trim()) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.text(kodeDokumen.trim(), 105, currentY, { align: 'center' });
+          currentY += 6;
+        }
+        if (formattedNomorSurat) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.text(formattedNomorSurat, 12, currentY, { align: 'left' });
+          currentY += 5;
+        }
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
         doc.setTextColor(0, 0, 0);
-        doc.text('BERITA ACARA KETIDAKHADIRAN PESERTA TRAINING', 105, 18, { align: 'center' });
-        doc.text('DAN PERMOHONAN DISPENSASI KETIDAKHADIRAN', 105, 24, { align: 'center' });
+        doc.text('BERITA ACARA KETIDAKHADIRAN PESERTA TRAINING', 105, currentY, { align: 'center' });
+        currentY += 6;
+        doc.text('DAN PERMOHONAN DISPENSASI KETIDAKHADIRAN', 105, currentY, { align: 'center' });
+        currentY += 8;
 
         // Paragraf Pengantar
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
         const introText = `Pada pelaksanaan kegiatan ${cabangCetak} periode Bulan ${bulanCetak} Tahun ${tahunCetak}, ditemukan adanya peserta training karyawan eksisting yang tidak dapat mengikuti beberapa jenis training. Berikut kami sampaikan rekapitulasi ketidakhadiran peserta berdasarkan jenis training sebagai dasar pengajuan dispensasi kepada ETD.`;
         const splitIntro = doc.splitTextToSize(introText, 186);
-        doc.text(splitIntro, 12, 33);
+        doc.text(splitIntro, 12, currentY);
 
-        let currentY = 33 + splitIntro.length * 5 + 2;
+        currentY += splitIntro.length * 5 + 2;
 
         const tableRows = (rekapData || []).map((row, idx) => [
           String(row.no || idx + 1),
@@ -1221,20 +1303,38 @@ export default function CetakPage() {
             : 1;
 
         // --- HALAMAN 1: BERITA ACARA UTAMA ---
+        let currentY = 16;
+        if (kodeDokumen && kodeDokumen.trim()) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.text(kodeDokumen.trim(), 105, currentY, { align: 'center' });
+          currentY += 6;
+        }
+        if (formattedNomorSurat) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.text(formattedNomorSurat, 12, currentY, { align: 'left' });
+          currentY += 5;
+        }
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
         doc.setTextColor(0, 0, 0);
-        doc.text('BERITA ACARA', 105, 18, { align: 'center' });
+        doc.text('BERITA ACARA', 105, currentY, { align: 'center' });
+        currentY += 6;
         doc.setFontSize(12);
-        doc.text(`PESERTA GAGAL MENGIKUTI TRAINING SOFT SKILL DASAR ${katJudul}`, 105, 24, { align: 'center' });
+        doc.text(`PESERTA GAGAL MENGIKUTI TRAINING SOFT SKILL DASAR ${katJudul}`, 105, currentY, { align: 'center' });
+        currentY += 7;
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
         const pText = `Pada hari ini, ${softSkillTanggalDibuat}, kami yang bertanda tangan di bawah ini menyatakan bahwa peserta berikut dari Cabang ${softSkillCabang} tidak dapat mengikuti Training Soft Skill Dasar ${softSkillKategoriLabel} pada periode ${softSkillPeriode} dengan alasan sebagaimana tercantum di bawah ini.`;
         const splitP = doc.splitTextToSize(pText, 186);
-        doc.text(splitP, 12, 33);
+        doc.text(splitP, 12, currentY);
 
-        let currentY = 33 + splitP.length * 4.5 + 3;
+        currentY += splitP.length * 4.5 + 3;
 
         doc.setFont('helvetica', 'bold');
         doc.text(`Cabang : ${softSkillCabang}`, 12, currentY);
@@ -1957,6 +2057,50 @@ export default function CetakPage() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Baris Input Nomor Surat & Kode Dokumen (Muncul di Atas Judul Cetak) */}
+        <div className="pt-3 border-t border-gray-100 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2.5">
+            <div className="flex items-center gap-1.5 font-bold text-gray-800 text-xs">
+              <FileText className="w-4 h-4 text-[#0056b3]" />
+              <span className="text-gray-900 font-extrabold">Pengaturan Nomor Surat &amp; Kode Dokumen</span>
+              <span className="text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded text-[10px] font-bold">
+                Muncul di Atas Judul
+              </span>
+            </div>
+            <span className="text-[11px] text-gray-600">
+              Otomatis tercetak di atas judul dokumen pada lembar cetak &amp; unduh PDF
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label className="block font-bold text-gray-800 mb-1 flex items-center justify-between">
+                <span>Nomor Surat / Berita Acara:</span>
+                <span className="text-[10px] text-gray-500 font-semibold">Tampil di Atas Judul (Kiri)</span>
+              </label>
+              <input
+                type="text"
+                value={nomorSurat}
+                onChange={(e) => handleNomorSuratChange(e.target.value)}
+                placeholder="Contoh: 003/BA-GT-CIF/SBY/IX/2026"
+                className="w-full bg-white border border-gray-300 rounded-lg p-2 font-medium text-xs text-gray-900 focus:ring-2 focus:ring-[#0056b3] focus:border-transparent transition-all placeholder:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-gray-800 mb-1 flex items-center justify-between">
+                <span>Kode Dokumen / Header (Opsional):</span>
+                <span className="text-[10px] text-gray-500 font-semibold">Tampil di Tengah Paling Atas</span>
+              </label>
+              <input
+                type="text"
+                value={kodeDokumen}
+                onChange={(e) => handleKodeDokumenChange(e.target.value)}
+                placeholder="Contoh: 0337/A1.05/HRD-SBY/IX/2026"
+                className="w-full bg-white border border-gray-300 rounded-lg p-2 font-medium text-xs text-gray-900 focus:ring-2 focus:ring-[#0056b3] focus:border-transparent transition-all placeholder:text-gray-400"
+              />
+            </div>
           </div>
         </div>
 
@@ -3008,6 +3152,8 @@ export default function CetakPage() {
               bulan={bulanCetak}
               tahun={tahunCetak}
               ttdImages={ttdImages}
+              nomorSurat={nomorSurat}
+              kodeDokumen={kodeDokumen}
             />
           </div>
         </ErrorBoundary>
@@ -3035,6 +3181,8 @@ export default function CetakPage() {
                   ? 1 + Math.ceil(filteredSoftSkillData.length / 3)
                   : 1
               }
+              nomorSurat={nomorSurat}
+              kodeDokumen={kodeDokumen}
             />
 
             {/* Lampiran Halaman Bukti Foto Peserta (Format Gambar 7 Lanjutan) */}
@@ -3060,6 +3208,8 @@ export default function CetakPage() {
           <LampiranListTidakHadir
             data={listTidakHadirData}
             selectedTraining={selectedTrainingListFilter}
+            nomorSurat={nomorSurat}
+            kodeDokumen={kodeDokumen}
           />
         </div>
       )}
@@ -3127,6 +3277,28 @@ export default function CetakPage() {
                           ))}
                         </colgroup>
                         <thead>
+                          {kodeDokumen && kodeDokumen.trim() ? (
+                            <tr>
+                              <th
+                                colSpan={horizontalCols}
+                                className="text-center font-normal text-xs text-black py-1 px-3"
+                                style={{ border: '1px solid #000000', backgroundColor: '#FFFFFF' }}
+                              >
+                                {kodeDokumen.trim()}
+                              </th>
+                            </tr>
+                          ) : null}
+                          {formattedNomorSurat ? (
+                            <tr>
+                              <th
+                                colSpan={horizontalCols}
+                                className="text-left font-normal text-xs text-black py-1 px-3"
+                                style={{ border: '1px solid #000000', backgroundColor: '#FFFFFF' }}
+                              >
+                                {formattedNomorSurat}
+                              </th>
+                            </tr>
+                          ) : null}
                           <tr>
                             <th
                               colSpan={horizontalCols}
@@ -3296,6 +3468,16 @@ export default function CetakPage() {
           </div>
 
           <div className="text-center my-6">
+            {kodeDokumen && kodeDokumen.trim() ? (
+              <div className="text-center font-normal text-xs sm:text-sm tracking-wide mb-2 text-black">
+                {kodeDokumen.trim()}
+              </div>
+            ) : null}
+            {formattedNomorSurat ? (
+              <div className="text-left font-normal text-xs sm:text-sm mb-2 text-black">
+                {formattedNomorSurat}
+              </div>
+            ) : null}
             <h1 className="text-base sm:text-lg font-black uppercase text-gray-900 tracking-wider underline font-title">
               BERITA ACARA KETIDAKHADIRAN PESERTA TRAINING
             </h1>

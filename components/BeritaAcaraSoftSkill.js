@@ -15,6 +15,8 @@ export default function BeritaAcaraSoftSkill({
   signerConfig = {},
   pageNumber = 1,
   totalDocPages = 1,
+  nomorSurat = '',
+  kodeDokumen = '',
 }) {
   const {
     mengetahui2_jabatan = 'Deputy Branch Manager ADM',
@@ -32,12 +34,29 @@ export default function BeritaAcaraSoftSkill({
   const hasSoftSkillTtd = Boolean(ttdImages?.paket_ttd_softskill);
   const isModeLengkap = mode_gambar === 'lengkap';
 
+  const formattedNomorSurat = nomorSurat && nomorSurat.trim()
+    ? (/^nomor\s*:/i.test(nomorSurat.trim()) ? nomorSurat.trim() : `Nomor: ${nomorSurat.trim()}`)
+    : '';
+
   return (
     <div
       className="sheet text-xs leading-relaxed flex flex-col"
       style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
     >
       <div className="flex-1">
+        {/* Header Kode Dokumen & Nomor Berita Acara */}
+        {kodeDokumen && kodeDokumen.trim() ? (
+          <div className="text-center font-normal text-xs sm:text-sm tracking-wide mb-3 text-black">
+            {kodeDokumen.trim()}
+          </div>
+        ) : null}
+
+        {formattedNomorSurat ? (
+          <div className="text-left font-normal text-xs sm:text-sm mb-2 text-black">
+            {formattedNomorSurat}
+          </div>
+        ) : null}
+
         {/* 1. Header Judul Berita Acara Soft Skill (Sesuai Gambar 7 & Kategori) */}
         <div className="text-center space-y-0.5 mb-4">
           <h1 className="text-base sm:text-lg font-bold tracking-wide uppercase leading-tight">
