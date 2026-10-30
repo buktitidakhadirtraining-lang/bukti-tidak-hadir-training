@@ -24,6 +24,7 @@ import { MAX_FILE_SIZE_BYTES, POSITIONS } from '../../../lib/config.js';
 import { compressImage, formatBytes } from '../../../lib/compress.js';
 import { validateImageFile } from '../../../lib/image-validator.js';
 import FileValidationModal from '../../../components/FileValidationModal.js';
+import { useMasterTrainings } from '../../../lib/useMasterTrainings.js';
 
 export default function InputPage() {
   const router = useRouter();
@@ -35,16 +36,35 @@ export default function InputPage() {
   const [validationErrors, setValidationErrors] = useState([]);
   const [showValidationModal, setShowValidationModal] = useState(false);
 
+  // Master Trainings Hook (selalu segar dari database, sinkron dengan Master)
+  const {
+    trainings,
+    loading: loadingTrainings,
+    error: errorTrainings,
+    refetch: refetchTrainings,
+  } = useMasterTrainings();
+
   // Form State
   const [nik, setNik] = useState('');
   const [namaPeserta, setNamaPeserta] = useState('');
   const [jabatan, setJabatan] = useState(POSITIONS[0] || 'Chief Of Store');
   const [branchId, setBranchId] = useState('');
-  const [trainingId, setTrainingId] = useState('');
+  const [trainingId, setTrainingId] = useState(''); // Default: placeholder 'Pilih Jenis Training'
   const [batch, setBatch] = useState('1');
   const [tanggal, setTanggal] = useState(() => new Date().toISOString().split('T')[0]);
   const [alasanId, setAlasanId] = useState('');
   const [keterangan, setKeterangan] = useState('');
+
+  // Reaktif: Jika jenis training yang sedang dipilih dinonaktifkan/dihapus di Master
+  useEffect(() => {
+    if (!loadingTrainings && trainingId && trainings.length > 0) {
+      const exists = trainings.some((t) => t.id === trainingId);
+      if (!exists) {
+        setTrainingId('');
+        toast.warning('Jenis training yang dipilih sudah tidak tersedia, pilih ulang.');
+      }
+    }
+  }, [trainings, loadingTrainings, trainingId]);
 
   // File Upload State
   const [selectedFile, setSelectedFile] = useState(null);
@@ -67,9 +87,6 @@ export default function InputPage() {
           }
           if (json.data.positions?.length > 0) {
             setJabatan(json.data.positions[0]);
-          }
-          if (json.data.trainings?.length > 0) {
-            setTrainingId(json.data.trainings[0].id);
           }
           if (json.data.reasons?.length > 0) {
             setAlasanId(json.data.reasons[0].id);
@@ -148,6 +165,11 @@ export default function InputPage() {
 
     if (!namaPeserta.trim()) {
       toast.error('Nama peserta wajib diisi');
+      return;
+    }
+
+    if (!trainingId) {
+      toast.error('Jenis Training wajib dipilih');
       return;
     }
 
@@ -373,21 +395,53 @@ export default function InputPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Jenis Training */}
               <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Jenis Training <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={trainingId}
-                  onChange={(e) => setTrainingId(e.target.value)}
-                  required
-                  className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#0056b3] min-h-[44px]"
-                >
-                  {meta?.trainings?.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Jenis Training <span className="text-red-500">*</span>
+                  </label>
+                  {errorTrainings && (
+                    <button
+                      type="button"
+                      onClick={() => refetchTrainings()}
+                      className="text-[11px] text-[#0056b3] hover:underline font-bold"
+                    >
+                      Coba Lagi
+                    </button>
+                  )}
+                </div>
+                {errorTrainings ? (
+                  <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center justify-between">
+                    <span>Gagal memuat Jenis Training</span>
+                    <button
+                      type="button"
+                      onClick={() => refetchTrainings()}
+                      className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs"
+                    >
+                      Coba Lagi
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={trainingId}
+                    onChange={(e) => setTrainingId(e.target.value)}
+                    required
+                    disabled={loadingTrainings || trainings.length === 0}
+                    className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#0056b3] min-h-[44px] disabled:opacity-60"
+                  >
+                    <option value="">
+                      {loadingTrainings
+                        ? 'Memuat jenis training...'
+                        : trainings.length === 0
+                        ? 'Belum ada jenis training aktif, hubungi Admin Pusat'
+                        : 'Pilih Jenis Training'}
                     </option>
-                  ))}
-                </select>
+                    {trainings.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Batch */}

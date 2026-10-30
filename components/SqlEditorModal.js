@@ -125,6 +125,8 @@ ALTER TABLE public.training_types ADD COLUMN IF NOT EXISTS sort_order INTEGER DE
 
 -- 5. TABEL: absence_reasons (Pastikan kolom sort_order ada)
 ALTER TABLE public.absence_reasons ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+-- TABEL: ttd_cabang (Tanda Tangan Elektronik Cabang)
 CREATE TABLE IF NOT EXISTS public.ttd_cabang (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cabang TEXT NOT NULL,
@@ -137,43 +139,14 @@ CREATE TABLE IF NOT EXISTS public.ttd_cabang (
     UNIQUE (cabang, peran)
 );
 
--- Hapus constraint lama jika tabel sudah pernah dibuat sebelumnya agar mendukung peran baru ('paket_ttd_rekap', 'paket_ttd_softskill')
 ALTER TABLE public.ttd_cabang DROP CONSTRAINT IF EXISTS ttd_cabang_peran_check;
 ALTER TABLE public.ttd_cabang DROP CONSTRAINT IF EXISTS ttd_cabang_updated_by_fkey;
-
--- Migrasi data lama: ubah peran 'paket_ttd' menjadi 'paket_ttd_rekap' untuk Berita Acara Rekap
--- Aman dijalankan ulang: hanya memperbarui record jika belum ada 'paket_ttd_rekap' di cabang bersangkutan
-UPDATE public.ttd_cabang
-SET peran = 'paket_ttd_rekap'
-WHERE peran = 'paket_ttd'
-  AND NOT EXISTS (
-    SELECT 1 FROM public.ttd_cabang t2
-    WHERE t2.cabang = public.ttd_cabang.cabang
-      AND t2.peran = 'paket_ttd_rekap'
-  );
-
 CREATE INDEX IF NOT EXISTS idx_ttd_cabang_lookup ON public.ttd_cabang (cabang, peran);
 ALTER TABLE public.ttd_cabang ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public access ttd_cabang" ON public.ttd_cabang;
+CREATE POLICY "Public access ttd_cabang" ON public.ttd_cabang FOR ALL USING (true) WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Select ttd_cabang per cabang" ON public.ttd_cabang;
-DROP POLICY IF EXISTS "Insert ttd_cabang per cabang" ON public.ttd_cabang;
-DROP POLICY IF EXISTS "Update ttd_cabang per cabang" ON public.ttd_cabang;
-DROP POLICY IF EXISTS "Delete ttd_cabang per cabang" ON public.ttd_cabang;
-
-CREATE POLICY "Select ttd_cabang per cabang" ON public.ttd_cabang
-    FOR SELECT USING (true);
-
-CREATE POLICY "Insert ttd_cabang per cabang" ON public.ttd_cabang
-    FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Update ttd_cabang per cabang" ON public.ttd_cabang
-    FOR UPDATE USING (true);
-
-CREATE POLICY "Delete ttd_cabang per cabang" ON public.ttd_cabang
-    FOR DELETE USING (true);
-
-
--- 4. TABEL: pengaturan_cetak (Menyimpan Pengaturan Nama & Jabatan Penandatangan Berita Acara)
+-- TABEL: pengaturan_cetak (Pengaturan Penandatangan Dokumen Cetak)
 CREATE TABLE IF NOT EXISTS public.pengaturan_cetak (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cabang TEXT NOT NULL,
@@ -187,30 +160,92 @@ CREATE TABLE IF NOT EXISTS public.pengaturan_cetak (
 ALTER TABLE public.pengaturan_cetak DROP CONSTRAINT IF EXISTS pengaturan_cetak_updated_by_fkey;
 CREATE INDEX IF NOT EXISTS idx_pengaturan_cetak_lookup ON public.pengaturan_cetak (cabang, jenis);
 ALTER TABLE public.pengaturan_cetak ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public access pengaturan_cetak" ON public.pengaturan_cetak;
+CREATE POLICY "Public access pengaturan_cetak" ON public.pengaturan_cetak FOR ALL USING (true) WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Select pengaturan_cetak per cabang" ON public.pengaturan_cetak;
-DROP POLICY IF EXISTS "Insert pengaturan_cetak per cabang" ON public.pengaturan_cetak;
-DROP POLICY IF EXISTS "Update pengaturan_cetak per cabang" ON public.pengaturan_cetak;
-DROP POLICY IF EXISTS "Delete pengaturan_cetak per cabang" ON public.pengaturan_cetak;
+-- 6. DUKUNGAN REALTIME & SINKRONISASI MASTER JENIS TRAINING
+-- Aktifkan Supabase Realtime pada tabel training_types agar perubahan nama terdeteksi instan di semua tab/perangkat
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'training_types'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.training_types;
+    END IF;
+END $$;
 
-CREATE POLICY "Select pengaturan_cetak per cabang" ON public.pengaturan_cetak
-    FOR SELECT USING (true);
+-- Pastikan kolom relasi training_id & jenis_training_id tersedia di data_tambahan & absence_records
+ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS training_id UUID;
+ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS jenis_training_id UUID;
+ALTER TABLE public.absence_records ADD COLUMN IF NOT EXISTS jenis_training_id UUID;
 
-CREATE POLICY "Insert pengaturan_cetak per cabang" ON public.pengaturan_cetak
-    FOR INSERT WITH CHECK (true);
+CREATE INDEX IF NOT EXISTS idx_data_tambahan_training_id ON public.data_tambahan (training_id);
+CREATE INDEX IF NOT EXISTS idx_absence_records_training_id ON public.absence_records (training_id);
 
-CREATE POLICY "Update pengaturan_cetak per cabang" ON public.pengaturan_cetak
-    FOR UPDATE USING (true);
+-- 7. FUNGSI CASCADE UPDATE NAMA TRAINING (Aman Dijalankan Ulang)
+CREATE OR REPLACE FUNCTION public.fn_update_training_name_cascade(
+    p_training_id UUID,
+    p_old_name TEXT,
+    p_new_name TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_abs_count INTEGER := 0;
+    v_dt_count INTEGER := 0;
+BEGIN
+    -- 1. Update nama di Master
+    UPDATE public.training_types
+    SET name = TRIM(p_new_name), updated_at = now()
+    WHERE id = p_training_id;
 
-CREATE POLICY "Delete pengaturan_cetak per cabang" ON public.pengaturan_cetak
-    FOR DELETE USING (true);
+    -- 2. Update referensi di absence_records
+    UPDATE public.absence_records
+    SET training_id = p_training_id,
+        jenis_training_id = p_training_id,
+        updated_at = now()
+    WHERE training_id = p_training_id;
+    GET DIAGNOSTICS v_abs_count = ROW_COUNT;
 
+    -- 3. Update nama & ID di data_tambahan (semua cabang)
+    UPDATE public.data_tambahan
+    SET training = TRIM(p_new_name),
+        training_id = p_training_id,
+        jenis_training_id = p_training_id,
+        updated_at = now()
+    WHERE training_id = p_training_id
+       OR (p_old_name IS NOT NULL AND TRIM(p_old_name) <> '' AND LOWER(training) = LOWER(TRIM(p_old_name)));
+    GET DIAGNOSTICS v_dt_count = ROW_COUNT;
 
--- 5. Berikan Izin Akses Tabel
+    -- 4. Update nama di tabel cetak bila ada
+    BEGIN
+        UPDATE public.cetak_rekap
+        SET jenis_training = TRIM(p_new_name), updated_at = now()
+        WHERE p_old_name IS NOT NULL AND LOWER(jenis_training) = LOWER(TRIM(p_old_name));
+    EXCEPTION WHEN OTHERS THEN
+        NULL;
+    END;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'updated_absence_records', v_abs_count,
+        'updated_data_tambahan', v_dt_count,
+        'total_updated', v_abs_count + v_dt_count
+    );
+END;
+$$;
+
+-- 8. Berikan Izin Akses Tabel & Fungsi
+GRANT EXECUTE ON FUNCTION public.fn_update_training_name_cascade(UUID, TEXT, TEXT) TO authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
--- 6. Reload Schema PostgREST
+-- 9. Reload Schema PostgREST
 NOTIFY pgrst, 'reload schema';`;
 
 export default function SqlEditorModal({ isOpen, onClose }) {

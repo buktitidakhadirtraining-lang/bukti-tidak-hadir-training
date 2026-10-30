@@ -70,6 +70,7 @@ export async function POST(request) {
 
     const contentType = request.headers.get('content-type') || '';
     let training = 'TRAINING';
+    let trainingId = null;
     let nik = '';
     let nama = '';
     let kd_toko = '-';
@@ -80,6 +81,7 @@ export async function POST(request) {
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       training = formData.get('training')?.toString().trim() || 'TRAINING';
+      trainingId = formData.get('training_id')?.toString().trim() || formData.get('jenis_training_id')?.toString().trim() || null;
       nik = formData.get('nik')?.toString().trim() || '';
       nama = formData.get('nama')?.toString().trim() || '';
       kd_toko = formData.get('kd_toko')?.toString().trim() || '-';
@@ -92,6 +94,7 @@ export async function POST(request) {
     } else {
       const body = await request.json().catch(() => ({}));
       training = body.training || 'TRAINING';
+      trainingId = body.training_id || body.jenis_training_id || null;
       nik = body.nik || '';
       nama = body.nama || '';
       kd_toko = body.kd_toko || '-';
@@ -152,11 +155,46 @@ export async function POST(request) {
       }
 
       const fileExt = (fotoFile.name?.split('.').pop() || 'jpg').toLowerCase();
-      const safeFileName = formatTambahanFileName(nik, nama, fileExt);
+      const validExtensions = ['jpg', 'jpeg', 'png'];
+      if (!validExtensions.includes(fileExt)) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Format file "${fotoFile.name}" tidak sesuai. Hanya file .jpg, .jpeg, dan .png yang diizinkan.`,
+          },
+          { status: 415 }
+        );
+      }
 
       const arrayBuffer = await fotoFile.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString('base64');
-      const mimeType = fotoFile.type || 'image/jpeg';
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Verifikasi Magic Bytes: JPEG (FF D8 FF), PNG (89 50 4E 47 0D 0A 1A 0A)
+      const isJpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+      const isPng =
+        buffer.length >= 8 &&
+        buffer[0] === 0x89 &&
+        buffer[1] === 0x50 &&
+        buffer[2] === 0x4e &&
+        buffer[3] === 0x47 &&
+        buffer[4] === 0x0d &&
+        buffer[5] === 0x0a &&
+        buffer[6] === 0x1a &&
+        buffer[7] === 0x0a;
+
+      if (!isJpeg && !isPng) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Format file "${fotoFile.name}" tidak sesuai dengan isinya. Hanya file JPG/JPEG dan PNG asli yang diizinkan.`,
+          },
+          { status: 415 }
+        );
+      }
+
+      const safeFileName = formatTambahanFileName(nik, nama, isJpeg ? 'jpg' : 'png');
+      const base64 = buffer.toString('base64');
+      const mimeType = isJpeg ? 'image/jpeg' : 'image/png';
 
       const uploadRes = await driveUpload(branch, {
         fileName: safeFileName,
@@ -179,6 +217,8 @@ export async function POST(request) {
     try {
       const saved = await insertDataTambahanRecord(
         {
+          training_id: trainingId,
+          jenis_training_id: trainingId,
           training: training || 'TRAINING',
           nik,
           nama,

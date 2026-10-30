@@ -22,9 +22,14 @@ import {
 } from 'lucide-react';
 import { POSITIONS } from '../lib/config.js';
 import { compressImage, formatBytes } from '../lib/compress.js';
+import { validateImageFile } from '../lib/image-validator.js';
+import FileValidationModal from './FileValidationModal.js';
+import { useMasterTrainings } from '../lib/useMasterTrainings.js';
 
 export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdated }) {
   const fileInputRef = useRef(null);
+
+  const { trainings } = useMasterTrainings();
 
   const [nik, setNik] = useState('');
   const [namaPeserta, setNamaPeserta] = useState('');
@@ -43,6 +48,8 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
   const [compressing, setCompressing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [showValidationModal, setShowValidationModal] = useState(false);
 
   // Sync form state with record when opened
   useEffect(() => {
@@ -77,37 +84,15 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
   const isOldPosition = jabatan && !POSITIONS.includes(jabatan);
   const hasExistingProof = Boolean(record.drive_file_id);
 
-  // Handle file selection & automatic browser compression
+  // Handle file selection & automatic browser compression (Hanya JPG/PNG)
   async function handleFileChange(file) {
     if (!file) return;
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Format berkas tidak didukung. Harap pilih gambar (JPG/PNG/WebP) atau PDF.');
-      return;
-    }
-
-    // Dokumen PDF: batas 1 MB
-    if (file.type === 'application/pdf') {
-      const ONE_MB = 1 * 1024 * 1024;
-      if (file.size > ONE_MB) {
-        toast.error(
-          `Ukuran dokumen PDF melebihi 1 MB (${formatBytes(file.size)}). Silakan perkecil dokumen terlebih dahulu.`
-        );
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
-      }
-
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setSelectedFile(file);
-      setFileStats({
-        originalSize: file.size,
-        compressedSize: file.size,
-        sizeSummary: formatBytes(file.size),
-        isPdf: true,
-      });
-      setPreviewUrl(null);
-      toast.success(`Dokumen PDF siap diunggah (${formatBytes(file.size)})`);
+    const validation = await validateImageFile(file);
+    if (!validation.valid) {
+      setValidationErrors([validation.message]);
+      setShowValidationModal(true);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -374,7 +359,12 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
                   required
                   className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#0056b3] min-h-[40px]"
                 >
-                  {meta?.trainings?.map((t) => (
+                  {trainingId && !trainings.some((t) => t.id === trainingId) && (
+                    <option value={trainingId}>
+                      {record.training_types?.name || 'Jenis Training Sebelumnya'}
+                    </option>
+                  )}
+                  {trainings.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
                     </option>
@@ -506,7 +496,7 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
+                accept="image/jpeg,image/png,.jpg,.jpeg,.png"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -538,10 +528,10 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
                     <UploadCloud className="w-5 h-5" />
                   </div>
                   <p className="text-xs font-bold text-gray-800">
-                    Klik untuk memilih atau seret berkas ke sini
+                    Klik untuk memilih atau seret foto ke sini
                   </p>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    Mendukung Foto (JPG, PNG, WebP) dikompres otomatis & Dokumen PDF (Maks. 1 MB)
+                    Hanya mendukung Foto (JPG, JPEG, PNG) &bull; Otomatis dikompres
                   </p>
                 </div>
               )}
@@ -621,6 +611,15 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
           </div>
         </form>
       </div>
+
+      <FileValidationModal
+        isOpen={showValidationModal}
+        onClose={() => {
+          setShowValidationModal(false);
+          setValidationErrors([]);
+        }}
+        errors={validationErrors}
+      />
     </div>
   );
 }

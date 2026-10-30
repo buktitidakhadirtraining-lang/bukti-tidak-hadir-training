@@ -4,8 +4,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Loader2, Edit3, Image as ImageIcon, Trash2, Upload, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { MASTER_TRAININGS_LIST } from '../lib/trainings-master.js';
 import { compressImage, formatBytes } from '../lib/compress.js';
+import { validateImageFile } from '../lib/image-validator.js';
+import FileValidationModal from './FileValidationModal.js';
+import { useMasterTrainings } from '../lib/useMasterTrainings.js';
 
 export default function EditDataTambahanModal({
   isOpen,
@@ -18,6 +20,8 @@ export default function EditDataTambahanModal({
 }) {
   const fileInputRef = useRef(null);
 
+  const { trainings } = useMasterTrainings();
+
   const [training, setTraining] = useState('');
   const [nik, setNik] = useState('');
   const [nama, setNama] = useState('');
@@ -25,6 +29,8 @@ export default function EditDataTambahanModal({
   const [namaToko, setNamaToko] = useState('');
   const [alasanTidakHadir, setAlasanTidakHadir] = useState('');
   const [saving, setSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [showValidationModal, setShowValidationModal] = useState(false);
 
   // Foto State
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
@@ -75,9 +81,11 @@ export default function EditDataTambahanModal({
   async function handleSelectNewFile(file) {
     if (!file) return;
 
-    const MAX_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      toast.error(`Ukuran file melebihi batas maksimal 5 MB (${formatBytes(file.size)})`);
+    const validation = await validateImageFile(file);
+    if (!validation.valid) {
+      setValidationErrors([validation.message]);
+      setShowValidationModal(true);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -196,9 +204,12 @@ export default function EditDataTambahanModal({
               onChange={(e) => setTraining(e.target.value)}
               className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
             >
-              {MASTER_TRAININGS_LIST.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {training && !trainings.some((t) => t.name.toUpperCase() === training.toUpperCase()) && (
+                <option value={training}>{training}</option>
+              )}
+              {trainings.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name}
                 </option>
               ))}
             </select>
@@ -291,7 +302,7 @@ export default function EditDataTambahanModal({
             <input
               type="file"
               ref={fileInputRef}
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,.jpg,.jpeg,.png"
               className="hidden"
               onChange={(e) => {
                 if (e.target.files?.[0]) handleSelectNewFile(e.target.files[0]);
@@ -438,6 +449,15 @@ export default function EditDataTambahanModal({
           </div>
         </form>
       </div>
+
+      <FileValidationModal
+        isOpen={showValidationModal}
+        onClose={() => {
+          setShowValidationModal(false);
+          setValidationErrors([]);
+        }}
+        errors={validationErrors}
+      />
     </div>
   );
 }

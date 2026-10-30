@@ -1,4 +1,3 @@
-// app/(app)/admin/training/page.js
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,8 +9,11 @@ import {
   Trash2,
   Loader2,
   XCircle,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import ConfirmDialog from '../../../../components/ConfirmDialog.js';
+import { notifyTrainingTypesChanged, sortTrainings } from '../../../../lib/useMasterTrainings.js';
 
 export default function AdminTrainingPage() {
   const [trainings, setTrainings] = useState([]);
@@ -25,6 +27,20 @@ export default function AdminTrainingPage() {
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Cascade Rename Confirmation State
+  const [cascadeDialog, setCascadeDialog] = useState({
+    isOpen: false,
+    item: null,
+    oldName: '',
+    newName: '',
+    description: '',
+    isActive: true,
+    countAbsence: 0,
+    countTambahan: 0,
+    totalCount: 0,
+    loading: false,
+  });
+
   // Delete State
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, item: null, loading: false });
 
@@ -33,7 +49,9 @@ export default function AdminTrainingPage() {
     try {
       const res = await fetch('/api/admin/trainings');
       const json = await res.json();
-      if (json.ok) setTrainings(json.data || []);
+      if (json.ok) {
+        setTrainings(sortTrainings(json.data || []));
+      }
     } catch (e) {
       toast.error('Gagal memuat data modul training');
     } finally {
@@ -61,40 +79,126 @@ export default function AdminTrainingPage() {
     setIsModalOpen(true);
   }
 
+  async function executeDirectSave(payloadName, payloadDesc, payloadActive) {
+    const url = editingItem ? `/api/admin/trainings/${editingItem.id}` : '/api/admin/trainings';
+    const method = editingItem ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: payloadName,
+        description: payloadDesc,
+        is_active: payloadActive,
+      }),
+    });
+
+    const json = await res.json();
+    if (res.ok && json.ok) {
+      notifyTrainingTypesChanged();
+      toast.success('Perubahan tersimpan. Pilihan Jenis Training di semua menu diperbarui otomatis.');
+      setIsModalOpen(false);
+      loadData();
+    } else {
+      toast.error(json.error || 'Gagal menyimpan modul training');
+    }
+  }
+
   async function handleSave(e) {
     e.preventDefault();
-    if (!name.trim()) {
+    const cleanName = name.trim();
+    if (!cleanName) {
       toast.error('Nama modul training wajib diisi');
       return;
     }
 
     setSaving(true);
     try {
-      const url = editingItem ? `/api/admin/trainings/${editingItem.id}` : '/api/admin/trainings';
-      const method = editingItem ? 'PUT' : 'POST';
+      // Jika sedang mengedit dan nama berubah, periksa apakah nama lama dipakai di Input Data / Input Data Tambahan
+      if (editingItem && editingItem.name.trim().toLowerCase() !== cleanName.toLowerCase()) {
+        const checkRes = await fetch(
+          `/api/admin/trainings/check-usage?id=${editingItem.id}&name=${encodeURIComponent(
+            editingItem.name.trim()
+          )}`
+        );
+        const checkJson = await checkRes.json();
 
-      const res = await fetch(url, {
-        method,
+        if (checkJson.ok && checkJson.totalCount > 0) {
+          // Ada data yang memakai nama lama -> tampilkan dialog konfirmasi cascade
+          setCascadeDialog({
+            isOpen: true,
+            item: editingItem,
+            oldName: editingItem.name.trim(),
+            newName: cleanName,
+            description: description.trim() || null,
+            isActive,
+            countAbsence: checkJson.countAbsence,
+            countTambahan: checkJson.countTambahan,
+            totalCount: checkJson.totalCount,
+            loading: false,
+          });
+          setSaving(false);
+          return;
+        }
+      }
+
+      await executeDirectSave(cleanName, description.trim() || null, isActive);
+    } catch (e) {
+      toast.error('Terjadi kesalahan jaringan');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Menjalankan cascade update ke seluruh tabel
+  async function handleCascadeConfirm(updateLegacy = true) {
+    setCascadeDialog((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch('/api/admin/trainings/cascade-rename', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          is_active: isActive,
+          id: cascadeDialog.item.id,
+          oldName: cascadeDialog.oldName,
+          newName: cascadeDialog.newName,
+          updateLegacy,
         }),
       });
 
       const json = await res.json();
       if (res.ok && json.ok) {
-        toast.success(json.message);
+        // Update deskripsi dan status jika ada
+        if (
+          cascadeDialog.description !== cascadeDialog.item.description ||
+          cascadeDialog.isActive !== cascadeDialog.item.is_active
+        ) {
+          await fetch(`/api/admin/trainings/${cascadeDialog.item.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: cascadeDialog.newName,
+              description: cascadeDialog.description,
+              is_active: cascadeDialog.isActive,
+            }),
+          });
+        }
+
+        notifyTrainingTypesChanged();
+        toast.success(
+          updateLegacy
+            ? `Perubahan tersimpan. Nama baru diperbarui pada ${json.summary?.total_updated || 0} data di semua menu.`
+            : 'Perubahan tersimpan. Pilihan Jenis Training di semua menu diperbarui otomatis.'
+        );
+        setCascadeDialog({ isOpen: false, item: null, loading: false });
         setIsModalOpen(false);
         loadData();
       } else {
-        toast.error(json.error || 'Gagal menyimpan modul training');
+        toast.error(json.error || 'Gagal memperbarui data');
+        setCascadeDialog((prev) => ({ ...prev, loading: false }));
       }
-    } catch (e) {
+    } catch (err) {
       toast.error('Terjadi kesalahan jaringan');
-    } finally {
-      setSaving(false);
+      setCascadeDialog((prev) => ({ ...prev, loading: false }));
     }
   }
 
@@ -107,7 +211,8 @@ export default function AdminTrainingPage() {
       const res = await fetch(`/api/admin/trainings/${item.id}`, { method: 'DELETE' });
       const json = await res.json();
       if (res.ok && json.ok) {
-        toast.success('Modul training berhasil dihapus');
+        notifyTrainingTypesChanged();
+        toast.success('Modul training berhasil dihapus. Pilihan di semua menu diperbarui.');
         setDeleteDialog({ isOpen: false, item: null, loading: false });
         loadData();
       } else {
@@ -276,6 +381,87 @@ export default function AdminTrainingPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Dialog Konfirmasi Pembaruan Nama Lama (Cascade Update) */}
+      {cascadeDialog.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100">
+            <div className="indomaret-bar">
+              <div className="indomaret-bar-blue" />
+              <div className="indomaret-bar-yellow" />
+              <div className="indomaret-bar-red" />
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 shrink-0">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 font-title">
+                    Perbarui Data yang Sudah Tersimpan?
+                  </h3>
+                  <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
+                    Nama lama <strong className="text-gray-900">&quot;{cascadeDialog.oldName}&quot;</strong> dipakai oleh{' '}
+                    <strong className="text-[#0056b3]">{cascadeDialog.countAbsence} data</strong> di Input Data dan{' '}
+                    <strong className="text-[#0056b3]">{cascadeDialog.countTambahan} data</strong> di Input Data Tambahan (semua cabang).
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Apakah Anda ingin memperbarui seluruh data lama tersebut ke nama baru{' '}
+                    <strong className="text-emerald-700">&quot;{cascadeDialog.newName}&quot;</strong>?
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-[11px] text-blue-900 space-y-1">
+                <p>
+                  &bull; <strong>Perbarui Semua:</strong> Mengganti nama di Master sekaligus memperbarui teks nama & ID pada seluruh data ketidakhadiran di semua cabang secara otomatis.
+                </p>
+                <p>
+                  &bull; <strong>Lewati:</strong> Hanya mengubah nama di Master untuk input ke depan, data lama tetap memakai nama sebelumnya.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-end gap-2 text-xs">
+                <button
+                  type="button"
+                  disabled={cascadeDialog.loading}
+                  onClick={() => setCascadeDialog({ isOpen: false, item: null, loading: false })}
+                  className="px-3.5 py-2 border border-gray-300 rounded-xl font-bold text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={cascadeDialog.loading}
+                  onClick={() => handleCascadeConfirm(false)}
+                  className="px-4 py-2 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-[#0056b3] rounded-xl font-bold transition-colors"
+                >
+                  Lewati
+                </button>
+                <button
+                  type="button"
+                  disabled={cascadeDialog.loading}
+                  onClick={() => handleCascadeConfirm(true)}
+                  className="px-5 py-2 bg-[#0056b3] hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {cascadeDialog.loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Memperbarui Semua Data...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Perbarui Semua</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

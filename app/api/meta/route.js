@@ -22,7 +22,12 @@ export async function GET(request) {
         .select('id, name, code, is_active, drive_bridge_url, drive_bridge_secret_enc')
         .eq('is_active', true)
         .order('name'),
-      supabase.from('training_types').select('id, name, is_active, sort_order').eq('is_active', true).order('sort_order'),
+      supabase
+        .from('training_types')
+        .select('id, name, is_active, sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true, nullsFirst: false })
+        .order('name', { ascending: true }),
       supabase.from('absence_reasons').select('id, name, is_active').eq('is_active', true).order('name'),
     ]);
 
@@ -57,13 +62,21 @@ export async function GET(request) {
       driveReady: Boolean(b.drive_bridge_url && b.drive_bridge_secret_enc),
     }));
 
-    const trainings = trainingsRes.data || [];
+    const rawTrainings = trainingsRes.data || [];
+    const trainings = [...rawTrainings].sort((a, b) => {
+      const hasOrderA = typeof a.sort_order === 'number' && !isNaN(a.sort_order) && a.sort_order !== 0;
+      const hasOrderB = typeof b.sort_order === 'number' && !isNaN(b.sort_order) && b.sort_order !== 0;
+      if (hasOrderA && hasOrderB && a.sort_order !== b.sort_order) {
+        return a.sort_order - b.sort_order;
+      }
+      return String(a.name || '').localeCompare(String(b.name || ''), 'id', { sensitivity: 'base', numeric: true });
+    });
 
     const currentYear = new Date().getFullYear();
     const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
     const batches = Array.from({ length: 50 }, (_, i) => i + 1);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       data: {
         branches,
@@ -77,6 +90,12 @@ export async function GET(request) {
         userBranchId: session.branchId,
       },
     });
+
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+
+    return response;
   } catch (err) {
     console.error('[Meta API Error]:', err);
     return NextResponse.json(

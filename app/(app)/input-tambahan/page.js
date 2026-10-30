@@ -22,7 +22,6 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { MASTER_TRAININGS_LIST } from '../../../lib/trainings-master.js';
 import { compressImage, formatBytes } from '../../../lib/compress.js';
 import { validateImageFile } from '../../../lib/image-validator.js';
 import FileValidationModal from '../../../components/FileValidationModal.js';
@@ -31,17 +30,41 @@ import ImportExportModal from '../../../components/ImportExportModal.js';
 import ConfirmDialog from '../../../components/ConfirmDialog.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 import ProofImageDisplay from '../../../components/ProofImageDisplay.js';
+import { useMasterTrainings } from '../../../lib/useMasterTrainings.js';
 import { Database } from 'lucide-react';
 
 export default function InputTambahanPage() {
   const fileInputRef = useRef(null);
 
-  const [training, setTraining] = useState('YFC');
+  // Hook Master Jenis Training (selalu segar dari database & realtime)
+  const {
+    trainings,
+    loading: loadingTrainings,
+    error: errorTrainings,
+    refetch: refetchTrainings,
+  } = useMasterTrainings();
+
+  const [trainingId, setTrainingId] = useState('');
+  const [training, setTraining] = useState('');
   const [nik, setNik] = useState('');
   const [nama, setNama] = useState('');
   const [kdToko, setKdToko] = useState('');
   const [namaToko, setNamaToko] = useState('');
   const [alasanTidakHadir, setAlasanTidakHadir] = useState('Sakit');
+
+  // Reaktif: Jika jenis training yang dipilih diubah namanya atau dinonaktifkan di Master
+  useEffect(() => {
+    if (!loadingTrainings && trainingId && trainings.length > 0) {
+      const found = trainings.find((t) => t.id === trainingId);
+      if (!found) {
+        setTrainingId('');
+        setTraining('');
+        toast.warning('Jenis training yang dipilih sudah tidak tersedia, pilih ulang.');
+      } else if (found.name !== training) {
+        setTraining(found.name);
+      }
+    }
+  }, [trainings, loadingTrainings, trainingId, training]);
 
   // Foto State
   const [selectedFile, setSelectedFile] = useState(null);
@@ -158,6 +181,10 @@ export default function InputTambahanPage() {
 
   async function handleSubmit(e, skipPhoto = false) {
     if (e?.preventDefault) e.preventDefault();
+    if (!trainingId || !training.trim()) {
+      toast.error('Jenis Training wajib dipilih');
+      return;
+    }
     if (!nik.trim() || !nama.trim()) {
       toast.error('NIK dan Nama Peserta wajib diisi');
       return;
@@ -172,6 +199,8 @@ export default function InputTambahanPage() {
       let res;
       if (hasPhoto) {
         const formData = new FormData();
+        formData.append('training_id', trainingId);
+        formData.append('jenis_training_id', trainingId);
         formData.append('training', training.trim());
         formData.append('nik', nik.trim());
         formData.append('nama', nama.trim());
@@ -191,6 +220,8 @@ export default function InputTambahanPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            training_id: trainingId,
+            jenis_training_id: trainingId,
             training: training.trim(),
             nik: nik.trim(),
             nama: nama.trim(),
@@ -367,20 +398,58 @@ export default function InputTambahanPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
             {/* 1. Jenis Training */}
             <div>
-              <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Jenis Training <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={training}
-                onChange={(e) => setTraining(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
-              >
-                {MASTER_TRAININGS_LIST.map((tName) => (
-                  <option key={tName} value={tName}>
-                    {tName}
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block font-bold text-gray-700 uppercase tracking-wider">
+                  Jenis Training <span className="text-red-500">*</span>
+                </label>
+                {errorTrainings && (
+                  <button
+                    type="button"
+                    onClick={() => refetchTrainings()}
+                    className="text-[11px] text-[#0056b3] hover:underline font-bold"
+                  >
+                    Coba Lagi
+                  </button>
+                )}
+              </div>
+              {errorTrainings ? (
+                <div className="p-2 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center justify-between">
+                  <span>Gagal memuat</span>
+                  <button
+                    type="button"
+                    onClick={() => refetchTrainings()}
+                    className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded font-bold text-xs"
+                  >
+                    Coba Lagi
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={trainingId}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    setTrainingId(selectedId);
+                    const found = trainings.find((t) => t.id === selectedId);
+                    setTraining(found ? found.name : '');
+                  }}
+                  required
+                  disabled={loadingTrainings || trainings.length === 0}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3] disabled:opacity-60"
+                >
+                  <option value="">
+                    {loadingTrainings
+                      ? 'Memuat jenis training...'
+                      : trainings.length === 0
+                      ? 'Belum ada jenis training aktif, hubungi Admin Pusat'
+                      : 'Pilih Jenis Training'}
                   </option>
-                ))}
-              </select>
+                  {trainings.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* 2. NIK */}
@@ -580,7 +649,7 @@ export default function InputTambahanPage() {
                 <div className="py-4">
                   <UploadCloud className="w-10 h-10 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm font-bold text-gray-700">
-                    Tarik dan lepas bukti foto di sini, atau <span className="text-[#0056b3]">pilih file (JPG, PNG, WEBP)</span>
+                    Tarik dan lepas bukti foto di sini, atau <span className="text-[#0056b3]">pilih file (JPG, JPEG, PNG)</span>
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     Maksimal 5 MB. Foto otomatis dikompres di browser sebelum diunggah ke Google Drive cabang.
