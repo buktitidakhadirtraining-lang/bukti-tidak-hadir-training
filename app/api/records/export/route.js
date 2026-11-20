@@ -7,6 +7,7 @@ import { getSupabaseAdmin } from '../../../../lib/supabase.js';
 import { formatDateIndo } from '../../../../lib/config.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
 
 export async function GET(request) {
@@ -120,6 +121,7 @@ export async function GET(request) {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="${filename}"`,
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         },
       });
     }
@@ -254,6 +256,7 @@ export async function GET(request) {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       },
     });
   } catch (err) {

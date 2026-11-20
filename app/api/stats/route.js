@@ -4,6 +4,7 @@ import { getSessionFromRequest } from '../../../lib/session.js';
 import { getSupabaseAdmin } from '../../../lib/supabase.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
 
 export async function GET(request) {
@@ -133,19 +134,28 @@ export async function GET(request) {
       })
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
 
-    return NextResponse.json({
-      ok: true,
-      data: {
-        totalAbsent,
-        withProofCount,
-        withoutProofCount,
-        proofRatePercentage: totalAbsent > 0 ? Math.round((withProofCount / totalAbsent) * 100) : 0,
-        byTraining,
-        byReason,
-        byBranch,
-        monthlyTrend,
+    return NextResponse.json(
+      {
+        ok: true,
+        data: {
+          totalAbsent,
+          withProofCount,
+          withoutProofCount,
+          proofRatePercentage: totalAbsent > 0 ? Math.round((withProofCount / totalAbsent) * 100) : 0,
+          byTraining,
+          byReason,
+          byBranch,
+          monthlyTrend,
+        },
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    );
   } catch (err) {
     console.error('[Stats API Error]:', err);
     return NextResponse.json({ ok: false, error: 'Terjadi kesalahan sistem' }, { status: 500 });

@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '../../../lib/session.js';
 import { getSupabaseAdmin } from '../../../lib/supabase.js';
 import { POSITIONS, MONTHS } from '../../../lib/config.js';
+import { sortTrainings } from '../../../lib/training-utils.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
 
 export async function GET(request) {
@@ -63,14 +65,7 @@ export async function GET(request) {
     }));
 
     const rawTrainings = trainingsRes.data || [];
-    const trainings = [...rawTrainings].sort((a, b) => {
-      const hasOrderA = typeof a.sort_order === 'number' && !isNaN(a.sort_order) && a.sort_order !== 0;
-      const hasOrderB = typeof b.sort_order === 'number' && !isNaN(b.sort_order) && b.sort_order !== 0;
-      if (hasOrderA && hasOrderB && a.sort_order !== b.sort_order) {
-        return a.sort_order - b.sort_order;
-      }
-      return String(a.name || '').localeCompare(String(b.name || ''), 'id', { sensitivity: 'base', numeric: true });
-    });
+    const trainings = sortTrainings(rawTrainings);
 
     const currentYear = new Date().getFullYear();
     const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];

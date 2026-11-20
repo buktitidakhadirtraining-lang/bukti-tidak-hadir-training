@@ -30,19 +30,22 @@ import ImportExportModal from '../../../components/ImportExportModal.js';
 import ConfirmDialog from '../../../components/ConfirmDialog.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 import ProofImageDisplay from '../../../components/ProofImageDisplay.js';
-import { useMasterTrainings } from '../../../lib/useMasterTrainings.js';
+import { useJenisTraining } from '../../../lib/useJenisTraining.js';
 import { Database } from 'lucide-react';
 
 export default function InputTambahanPage() {
   const fileInputRef = useRef(null);
 
-  // Hook Master Jenis Training (selalu segar dari database & realtime)
+  // Hook Master Jenis Training (selalu segar dari tabel training_types)
   const {
     trainings,
     loading: loadingTrainings,
+    refreshing: refreshingTrainings,
     error: errorTrainings,
+    lastLoadedAt,
     refetch: refetchTrainings,
-  } = useMasterTrainings();
+    resolveTrainingName,
+  } = useJenisTraining();
 
   const [trainingId, setTrainingId] = useState('');
   const [training, setTraining] = useState('');
@@ -103,8 +106,8 @@ export default function InputTambahanPage() {
     async function loadMetaAndUser() {
       try {
         const [metaRes, userRes] = await Promise.all([
-          fetch('/api/meta'),
-          fetch('/api/auth/me'),
+          fetch('/api/meta', { cache: 'no-store' }),
+          fetch('/api/auth/me', { cache: 'no-store' }),
         ]);
         const metaJson = await metaRes.json();
         const userJson = await userRes.json();
@@ -121,7 +124,7 @@ export default function InputTambahanPage() {
   const fetchRecords = useCallback(async () => {
     setLoadingList(true);
     try {
-      const res = await fetch('/api/data-tambahan');
+      const res = await fetch('/api/data-tambahan', { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) {
         setRecords(json.data || []);
@@ -317,14 +320,17 @@ export default function InputTambahanPage() {
     }
   }
 
+  const isAdminPusat = (currentUser?.role || meta?.userRole) === 'admin_pusat';
+
   // Filter pencarian di tabel
   const filteredRecords = records.filter((r) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
+    const displayTraining = resolveTrainingName(r.jenis_training_id || r.training_id, r.training || '');
     return (
       (r.nik && String(r.nik).toLowerCase().includes(term)) ||
       (r.nama && String(r.nama).toLowerCase().includes(term)) ||
-      (r.training && String(r.training).toLowerCase().includes(term)) ||
+      (displayTraining && String(displayTraining).toLowerCase().includes(term)) ||
       (r.nama_toko && String(r.nama_toko).toLowerCase().includes(term)) ||
       (r.alasan_tidak_hadir && String(r.alasan_tidak_hadir).toLowerCase().includes(term))
     );
@@ -414,7 +420,7 @@ export default function InputTambahanPage() {
               </div>
               {errorTrainings ? (
                 <div className="p-2 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center justify-between">
-                  <span>Gagal memuat</span>
+                  <span>Gagal memuat Jenis Training</span>
                   <button
                     type="button"
                     onClick={() => refetchTrainings()}
@@ -449,6 +455,32 @@ export default function InputTambahanPage() {
                     </option>
                   ))}
                 </select>
+              )}
+              {isAdminPusat && !errorTrainings && (
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+                  <span>
+                    Sumber: <span className="font-mono font-semibold text-gray-700">training_types</span> &bull;{' '}
+                    <span className="font-semibold text-gray-700">{trainings.length} jenis aktif</span> &bull; dimuat{' '}
+                    <span className="font-mono">
+                      {lastLoadedAt
+                        ? lastLoadedAt.toLocaleTimeString('id-ID', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })
+                        : '-'}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => refetchTrainings()}
+                    disabled={loadingTrainings || refreshingTrainings}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-blue-200 bg-blue-50 hover:bg-blue-100 text-[#0056b3] font-bold transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${loadingTrainings || refreshingTrainings ? 'animate-spin' : ''}`} />
+                    <span>Muat Ulang Daftar</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -751,7 +783,9 @@ export default function InputTambahanPage() {
                 filteredRecords.map((r, i) => (
                   <tr key={r.id || i} className="hover:bg-gray-50/80 transition-colors">
                     <td className="p-3 text-center font-bold text-gray-500">{r.no || i + 1}</td>
-                    <td className="p-3 font-semibold text-blue-700 uppercase">{r.training}</td>
+                    <td className="p-3 font-semibold text-blue-700 uppercase">
+                      {resolveTrainingName(r.jenis_training_id || r.training_id, r.training || '-')}
+                    </td>
                     <td className="p-3 text-center font-mono font-bold text-gray-800">{r.nik}</td>
                     <td className="p-3 font-semibold text-gray-900 uppercase">{r.nama}</td>
                     <td className="p-3 text-center font-mono uppercase text-gray-600">{r.kd_toko || '-'}</td>
@@ -816,7 +850,13 @@ export default function InputTambahanPage() {
                 <h3 className="text-base font-bold text-gray-900 font-title">
                   Pratinjau Bukti Foto - {viewingPhotoRecord.nama}
                 </h3>
-                <p className="text-xs text-gray-500 font-mono">NIK: {viewingPhotoRecord.nik} &bull; {viewingPhotoRecord.training}</p>
+                <p className="text-xs text-gray-500 font-mono">
+                  NIK: {viewingPhotoRecord.nik} &bull;{' '}
+                  {resolveTrainingName(
+                    viewingPhotoRecord.jenis_training_id || viewingPhotoRecord.training_id,
+                    viewingPhotoRecord.training || '-'
+                  )}
+                </p>
               </div>
               <button
                 type="button"

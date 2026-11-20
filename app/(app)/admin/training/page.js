@@ -13,7 +13,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import ConfirmDialog from '../../../../components/ConfirmDialog.js';
-import { notifyTrainingTypesChanged, sortTrainings } from '../../../../lib/useMasterTrainings.js';
+import { notifyTrainingTypesChanged, sortTrainings } from '../../../../lib/useJenisTraining.js';
 
 export default function AdminTrainingPage() {
   const [trainings, setTrainings] = useState([]);
@@ -47,7 +47,7 @@ export default function AdminTrainingPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/trainings');
+      const res = await fetch(`/api/admin/trainings?_t=${Date.now()}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) {
         setTrainings(sortTrainings(json.data || []));
@@ -98,7 +98,7 @@ export default function AdminTrainingPage() {
       notifyTrainingTypesChanged();
       toast.success('Perubahan tersimpan. Pilihan Jenis Training di semua menu diperbarui otomatis.');
       setIsModalOpen(false);
-      loadData();
+      await loadData();
     } else {
       toast.error(json.error || 'Gagal menyimpan modul training');
     }
@@ -119,7 +119,8 @@ export default function AdminTrainingPage() {
         const checkRes = await fetch(
           `/api/admin/trainings/check-usage?id=${editingItem.id}&name=${encodeURIComponent(
             editingItem.name.trim()
-          )}`
+          )}&_t=${Date.now()}`,
+          { cache: 'no-store' }
         );
         const checkJson = await checkRes.json();
 
@@ -191,7 +192,7 @@ export default function AdminTrainingPage() {
         );
         setCascadeDialog({ isOpen: false, item: null, loading: false });
         setIsModalOpen(false);
-        loadData();
+        await loadData();
       } else {
         toast.error(json.error || 'Gagal memperbarui data');
         setCascadeDialog((prev) => ({ ...prev, loading: false }));
@@ -214,7 +215,7 @@ export default function AdminTrainingPage() {
         notifyTrainingTypesChanged();
         toast.success('Modul training berhasil dihapus. Pilihan di semua menu diperbarui.');
         setDeleteDialog({ isOpen: false, item: null, loading: false });
-        loadData();
+        await loadData();
       } else {
         toast.error(json.error || 'Gagal menghapus');
         setDeleteDialog((prev) => ({ ...prev, loading: false }));

@@ -24,12 +24,12 @@ import { POSITIONS } from '../lib/config.js';
 import { compressImage, formatBytes } from '../lib/compress.js';
 import { validateImageFile } from '../lib/image-validator.js';
 import FileValidationModal from './FileValidationModal.js';
-import { useMasterTrainings } from '../lib/useMasterTrainings.js';
+import { useJenisTraining } from '../lib/useJenisTraining.js';
 
-export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdated }) {
+export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdated, onSuccess }) {
   const fileInputRef = useRef(null);
 
-  const { trainings } = useMasterTrainings();
+  const { trainings } = useJenisTraining();
 
   const [nik, setNik] = useState('');
   const [namaPeserta, setNamaPeserta] = useState('');
@@ -58,7 +58,7 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
       setNamaPeserta(record.nama_peserta || '');
       setJabatan(record.jabatan || POSITIONS[0]);
       setBranchId(record.branch_id || '');
-      setTrainingId(record.training_id || '');
+      setTrainingId(record.jenis_training_id || record.training_id || '');
       setBatch(String(record.batch || '1'));
       setTanggal(record.tanggal_pelaksanaan || '');
       setAlasanId(record.alasan_id || '');
@@ -150,6 +150,7 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
       formData.append('jabatan', jabatan.trim());
       formData.append('branch_id', branchId);
       formData.append('training_id', trainingId);
+      formData.append('jenis_training_id', trainingId);
       formData.append('batch', batch);
       formData.append('tanggal_pelaksanaan', tanggal);
       formData.append('alasan_id', alasanId);
@@ -177,6 +178,8 @@ export default function EditRecordModal({ isOpen, onClose, record, meta, onUpdat
 
       if (onUpdated) {
         onUpdated(json.data);
+      } else if (onSuccess) {
+        onSuccess(json.data);
       }
       onClose();
     } catch (err) {

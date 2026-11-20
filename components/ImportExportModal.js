@@ -16,6 +16,7 @@ import {
 import { toast } from 'sonner';
 import Papa from 'papaparse';
 import ExcelJS from 'exceljs';
+import { useJenisTraining } from '../lib/useJenisTraining.js';
 
 export default function ImportExportModal({
   isOpen,
@@ -27,6 +28,7 @@ export default function ImportExportModal({
   onSuccess,
   currentRecords = [],
 }) {
+  const { trainings } = useJenisTraining();
   const [activeTab, setActiveTab] = useState('import'); // 'import' | 'export'
   const [file, setFile] = useState(null);
   const [parsedRows, setParsedRows] = useState([]);
@@ -232,10 +234,12 @@ export default function ImportExportModal({
       };
       headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
-      // Contoh baris
+      // Contoh baris menggunakan Master Jenis Training aktif
+      const sample1 = trainings?.[0]?.name || 'JENIS_TRAINING_MASTER';
+      const sample2 = trainings?.[1]?.name || trainings?.[0]?.name || 'JENIS_TRAINING_MASTER';
       worksheet.addRow({
         no: 1,
-        training: 'YFC',
+        training: sample1,
         nik: '2015698709',
         nama: 'AHMAD FAUZI',
         kd_toko: 'TXYZ',
@@ -244,7 +248,7 @@ export default function ImportExportModal({
       });
       worksheet.addRow({
         no: 2,
-        training: 'BARISTA',
+        training: sample2,
         nik: '2018451290',
         nama: 'SITI RAHMAWATI',
         kd_toko: 'TABC',

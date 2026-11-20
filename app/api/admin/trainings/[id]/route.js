@@ -4,7 +4,15 @@ import { getSessionFromRequest } from '../../../../../lib/session.js';
 import { getSupabaseAdmin } from '../../../../../lib/supabase.js';
 import { auditLog } from '../../../../../lib/audit.js';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
 
 export async function PUT(request, { params }) {
   try {
@@ -13,14 +21,17 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { id } = params;
-    const { name, description, is_active } = await request.json();
+    const { id } = await params;
+    const { name, description, is_active, sort_order } = await request.json();
 
     const supabase = getSupabaseAdmin();
     const updatePayload = { updated_at: new Date().toISOString() };
     if (name !== undefined) updatePayload.name = name.trim();
     if (description !== undefined) updatePayload.description = description ? description.trim() : null;
     if (is_active !== undefined) updatePayload.is_active = Boolean(is_active);
+    if (sort_order !== undefined && !Number.isNaN(Number(sort_order))) {
+      updatePayload.sort_order = Number(sort_order);
+    }
 
     const { data, error } = await supabase
       .from('training_types')
@@ -35,7 +46,10 @@ export async function PUT(request, { params }) {
 
     await auditLog(session.userId, 'UPDATE_TRAINING_TYPE', { id });
 
-    return NextResponse.json({ ok: true, message: 'Jenis training berhasil diperbarui', data });
+    return NextResponse.json(
+      { ok: true, message: 'Jenis training berhasil diperbarui', data },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err) {
     return NextResponse.json({ ok: false, error: 'Terjadi kesalahan sistem' }, { status: 500 });
   }
@@ -48,7 +62,7 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const supabase = getSupabaseAdmin();
 
     const { count } = await supabase
@@ -71,7 +85,10 @@ export async function DELETE(request, { params }) {
 
     await auditLog(session.userId, 'DELETE_TRAINING_TYPE', { id });
 
-    return NextResponse.json({ ok: true, message: 'Jenis training berhasil dihapus' });
+    return NextResponse.json(
+      { ok: true, message: 'Jenis training berhasil dihapus' },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err) {
     return NextResponse.json({ ok: false, error: 'Terjadi kesalahan sistem' }, { status: 500 });
   }

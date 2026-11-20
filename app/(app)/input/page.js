@@ -19,12 +19,13 @@ import {
   User,
   Hash,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { MAX_FILE_SIZE_BYTES, POSITIONS } from '../../../lib/config.js';
 import { compressImage, formatBytes } from '../../../lib/compress.js';
 import { validateImageFile } from '../../../lib/image-validator.js';
 import FileValidationModal from '../../../components/FileValidationModal.js';
-import { useMasterTrainings } from '../../../lib/useMasterTrainings.js';
+import { useJenisTraining } from '../../../lib/useJenisTraining.js';
 
 export default function InputPage() {
   const router = useRouter();
@@ -36,13 +37,15 @@ export default function InputPage() {
   const [validationErrors, setValidationErrors] = useState([]);
   const [showValidationModal, setShowValidationModal] = useState(false);
 
-  // Master Trainings Hook (selalu segar dari database, sinkron dengan Master)
+  // Master Trainings Hook (selalu segar dari tabel training_types)
   const {
     trainings,
     loading: loadingTrainings,
+    refreshing: refreshingTrainings,
     error: errorTrainings,
+    lastLoadedAt,
     refetch: refetchTrainings,
-  } = useMasterTrainings();
+  } = useJenisTraining();
 
   // Form State
   const [nik, setNik] = useState('');
@@ -76,7 +79,7 @@ export default function InputPage() {
   useEffect(() => {
     async function loadMeta() {
       try {
-        const res = await fetch('/api/meta');
+        const res = await fetch('/api/meta', { cache: 'no-store' });
         const json = await res.json();
         if (json.ok) {
           setMeta(json.data);
@@ -187,6 +190,7 @@ export default function InputPage() {
       formData.append('jabatan', jabatan);
       formData.append('branch_id', branchId);
       formData.append('training_id', trainingId);
+      formData.append('jenis_training_id', trainingId);
       formData.append('batch', batch);
       formData.append('tanggal_pelaksanaan', tanggal);
       formData.append('alasan_id', alasanId);
@@ -441,6 +445,32 @@ export default function InputPage() {
                       </option>
                     ))}
                   </select>
+                )}
+                {isAdminPusat && !errorTrainings && (
+                  <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+                    <span>
+                      Sumber: <span className="font-mono font-semibold text-gray-700">training_types</span> &bull;{' '}
+                      <span className="font-semibold text-gray-700">{trainings.length} jenis aktif</span> &bull; dimuat{' '}
+                      <span className="font-mono">
+                        {lastLoadedAt
+                          ? lastLoadedAt.toLocaleTimeString('id-ID', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })
+                          : '-'}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => refetchTrainings()}
+                      disabled={loadingTrainings || refreshingTrainings}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-blue-200 bg-blue-50 hover:bg-blue-100 text-[#0056b3] font-bold transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${loadingTrainings || refreshingTrainings ? 'animate-spin' : ''}`} />
+                      <span>Muat Ulang Daftar</span>
+                    </button>
+                  </div>
                 )}
               </div>
 

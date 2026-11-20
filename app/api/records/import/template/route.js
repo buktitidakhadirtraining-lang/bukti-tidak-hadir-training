@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import { getSessionFromRequest } from '../../../../../lib/session.js';
 import { getSupabaseAdmin } from '../../../../../lib/supabase.js';
+import { sortTrainings } from '../../../../../lib/training-utils.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
 
 export async function GET(request) {
@@ -37,7 +39,7 @@ export async function GET(request) {
         .order('name', { ascending: true }),
     ]);
 
-    const trainings = trainingsRes.data || [];
+    const trainings = sortTrainings(trainingsRes.data || []);
     const reasons = reasonsRes.data || [];
     const branches = branchesRes.data || [];
 
@@ -46,7 +48,7 @@ export async function GET(request) {
     const sampleReason2 = reasons.length > 1 ? reasons[1].name : sampleReason1;
 
     // Ambil contoh jenis training yang benar-benar ada di tabel training_types
-    const sampleTraining1 = trainings.length > 0 ? trainings[0].name : 'Fried Food';
+    const sampleTraining1 = trainings.length > 0 ? trainings[0].name : '';
     const sampleTraining2 = trainings.length > 1 ? trainings[1].name : sampleTraining1;
 
     // Tentukan contoh kode/nama cabang

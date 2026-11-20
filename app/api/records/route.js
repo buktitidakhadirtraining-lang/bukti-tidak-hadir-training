@@ -4,9 +4,17 @@ import { getSessionFromRequest } from '../../../lib/session.js';
 import { getSupabaseAdmin } from '../../../lib/supabase.js';
 import { validateEvidenceFile, driveUpload, driveTrash } from '../../../lib/drive.js';
 import { auditLog } from '../../../lib/audit.js';
+import { resolveTrainingName } from '../../../lib/training-utils.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
 
 // GET: Ambil daftar catatan ketidakhadiran dengan filter dan paginasi
 export async function GET(request) {
@@ -141,47 +149,63 @@ export async function GET(request) {
         tambahanQuery = tambahanQuery.or(`nik.ilike.%${cleanSearch}%,nama.ilike.%${cleanSearch}%`);
       }
     }
-    const { data: tambahanData } = await tambahanQuery;
+    const [{ data: tambahanData }, { data: masterTrainings }] = await Promise.all([
+      tambahanQuery,
+      supabase.from('training_types').select('id, name, is_active'),
+    ]);
     const cleanTambahan = (tambahanData || []).filter(
       (r) => r.sumber_input !== 'input_utama' && !r.source_record_id
     );
-    const mappedTambahan = cleanTambahan.map((item) => ({
-      id: item.id,
-      nik: item.nik,
-      nama_peserta: item.nama,
-      jabatan: '-',
-      batch: null,
-      tanggal_pelaksanaan: item.created_at,
-      keterangan: item.alasan_tidak_hadir,
-      drive_file_id: item.foto_drive_file_id,
-      drive_file_name: item.foto_file_name,
-      drive_file_url: null,
-      file_mime_type: item.foto_mime_type,
-      file_size_bytes: null,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      branch_id: item.branch_id,
-      training_id: item.training_id || null,
-      alasan_id: null,
-      branches: null,
-      training_types: { id: null, name: item.training },
-      absence_reasons: { id: null, name: item.alasan_tidak_hadir },
-      isTambahan: true,
-    }));
+    const mappedTambahan = cleanTambahan.map((item) => {
+      const linkedId = item.jenis_training_id || item.training_id || null;
+      const resolvedName = resolveTrainingName(masterTrainings || [], linkedId, item.training);
+      const matchedMaster = (masterTrainings || []).find(
+        (t) => (linkedId && String(t.id) === String(linkedId)) || t.name === resolvedName
+      );
+      const resolvedId = matchedMaster?.id || linkedId || null;
+
+      return {
+        id: item.id,
+        nik: item.nik,
+        nama_peserta: item.nama,
+        jabatan: '-',
+        batch: null,
+        tanggal_pelaksanaan: item.created_at,
+        keterangan: item.alasan_tidak_hadir,
+        drive_file_id: item.foto_drive_file_id,
+        drive_file_name: item.foto_file_name,
+        drive_file_url: null,
+        file_mime_type: item.foto_mime_type,
+        file_size_bytes: null,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        branch_id: item.branch_id,
+        training_id: resolvedId,
+        jenis_training_id: resolvedId,
+        alasan_id: null,
+        branches: null,
+        training_types: { id: resolvedId, name: resolvedName },
+        absence_reasons: { id: null, name: item.alasan_tidak_hadir },
+        isTambahan: true,
+      };
+    });
 
     const combinedData = [...(data || []), ...mappedTambahan];
     const totalCombinedCount = (count || 0) + mappedTambahan.length;
 
-    return NextResponse.json({
-      ok: true,
-      data: combinedData,
-      pagination: {
-        total: totalCombinedCount,
-        page,
-        limit,
-        totalPages: Math.ceil(totalCombinedCount / limit),
+    return NextResponse.json(
+      {
+        ok: true,
+        data: combinedData,
+        pagination: {
+          total: totalCombinedCount,
+          page,
+          limit,
+          totalPages: Math.ceil(totalCombinedCount / limit),
+        },
       },
-    });
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err) {
     console.error('[Records GET Error]:', err);
     return NextResponse.json({ ok: false, error: 'Terjadi kesalahan sistem' }, { status: 500 });
@@ -210,7 +234,7 @@ export async function POST(request) {
     const nik = formData.get('nik')?.toString().trim();
     const nama_peserta = formData.get('nama_peserta')?.toString().trim();
     const jabatan = formData.get('jabatan')?.toString().trim();
-    const training_id = formData.get('training_id')?.toString().trim();
+    const training_id = (formData.get('training_id') || formData.get('jenis_training_id'))?.toString().trim();
     const batch = formData.get('batch')?.toString().trim();
     const tanggal_pelaksanaan = formData.get('tanggal_pelaksanaan')?.toString().trim();
     let branch_id = formData.get('branch_id')?.toString().trim();
@@ -339,12 +363,13 @@ export async function POST(request) {
       );
     }
 
-    // Simpan data ke tabel absence_records dengan penanda sumber_input = 'input_utama'
+    // Simpan data ke tabel absence_records dengan penanda sumber_input = 'input_utama' & relasi training_id / jenis_training_id
     let insertPayload = {
       nik,
       nama_peserta,
       jabatan,
       training_id,
+      jenis_training_id: training_id,
       batch: parseInt(batch, 10),
       tanggal_pelaksanaan,
       branch_id,
@@ -365,8 +390,18 @@ export async function POST(request) {
       .select()
       .single();
 
-    if (insertError && (insertError.message?.includes('sumber_input') || insertError.code === 'PGRST204')) {
-      delete insertPayload.sumber_input;
+    for (let attempt = 0; attempt < 3 && insertError; attempt++) {
+      const msg = insertError.message || '';
+      let modified = false;
+      if (insertPayload.sumber_input !== undefined && (msg.includes('sumber_input') || insertError.code === 'PGRST204')) {
+        delete insertPayload.sumber_input;
+        modified = true;
+      }
+      if (insertPayload.jenis_training_id !== undefined && (msg.includes('jenis_training_id') || insertError.code === 'PGRST204')) {
+        delete insertPayload.jenis_training_id;
+        modified = true;
+      }
+      if (!modified) break;
       const retry = await supabase.from('absence_records').insert(insertPayload).select().single();
       newRecord = retry.data;
       insertError = retry.error;

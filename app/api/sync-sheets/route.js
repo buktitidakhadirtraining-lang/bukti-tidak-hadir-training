@@ -12,7 +12,14 @@ import {
 import { getSupabaseAdmin } from '../../../lib/supabase.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
 
 export async function GET(request) {
   try {
@@ -51,7 +58,7 @@ export async function GET(request) {
       rawListTidakHadir: listTidakHadir || [],
       dataTambahan: dataTambahan || [],
       softSkill: softSkillData || [],
-    });
+    }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     console.error('[API Sync/Cetak Data Error]:', err);
     return NextResponse.json(

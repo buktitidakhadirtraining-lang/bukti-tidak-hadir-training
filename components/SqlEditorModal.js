@@ -183,7 +183,28 @@ ALTER TABLE public.data_tambahan ADD COLUMN IF NOT EXISTS jenis_training_id UUID
 ALTER TABLE public.absence_records ADD COLUMN IF NOT EXISTS jenis_training_id UUID;
 
 CREATE INDEX IF NOT EXISTS idx_data_tambahan_training_id ON public.data_tambahan (training_id);
+CREATE INDEX IF NOT EXISTS idx_data_tambahan_jenis_training_id ON public.data_tambahan (jenis_training_id);
 CREATE INDEX IF NOT EXISTS idx_absence_records_training_id ON public.absence_records (training_id);
+CREATE INDEX IF NOT EXISTS idx_absence_records_jenis_training_id ON public.absence_records (jenis_training_id);
+
+-- Backfill aman & idempoten agar data lama terhubung ke ID Master training_types
+UPDATE public.absence_records
+SET jenis_training_id = training_id
+WHERE jenis_training_id IS NULL AND training_id IS NOT NULL;
+
+UPDATE public.data_tambahan AS dt
+SET training_id = tt.id,
+    jenis_training_id = tt.id
+FROM public.training_types AS tt
+WHERE dt.training_id IS NULL
+  AND dt.training IS NOT NULL
+  AND LOWER(TRIM(REGEXP_REPLACE(dt.training, '\s+', ' ', 'g'))) = LOWER(TRIM(REGEXP_REPLACE(tt.name, '\s+', ' ', 'g')));
+
+UPDATE public.data_tambahan
+SET jenis_training_id = COALESCE(jenis_training_id, training_id),
+    training_id = COALESCE(training_id, jenis_training_id)
+WHERE (jenis_training_id IS NULL AND training_id IS NOT NULL)
+   OR (training_id IS NULL AND jenis_training_id IS NOT NULL);
 
 -- 7. FUNGSI CASCADE UPDATE NAMA TRAINING (Aman Dijalankan Ulang)
 CREATE OR REPLACE FUNCTION public.fn_update_training_name_cascade(

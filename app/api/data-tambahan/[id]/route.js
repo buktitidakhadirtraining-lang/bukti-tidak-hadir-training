@@ -10,7 +10,14 @@ import {
 import { driveUpload, driveTrash } from '../../../../lib/drive.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
 
 function formatTambahanFileName(nik, nama, ext = 'jpg') {
   const cleanNik = String(nik || '').trim();
@@ -55,6 +62,7 @@ export async function PUT(request, { params }) {
     }
 
     let training = currentRec.training;
+    let trainingId = currentRec.jenis_training_id || currentRec.training_id || null;
     let nik = currentRec.nik;
     let nama = currentRec.nama;
     let kd_toko = currentRec.kd_toko;
@@ -67,6 +75,12 @@ export async function PUT(request, { params }) {
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       if (formData.has('training')) training = formData.get('training')?.toString().trim();
+      if (formData.has('training_id') || formData.has('jenis_training_id')) {
+        trainingId =
+          formData.get('training_id')?.toString().trim() ||
+          formData.get('jenis_training_id')?.toString().trim() ||
+          null;
+      }
       if (formData.has('nik')) nik = formData.get('nik')?.toString().trim();
       if (formData.has('nama')) nama = formData.get('nama')?.toString().trim();
       if (formData.has('kd_toko')) kd_toko = formData.get('kd_toko')?.toString().trim();
@@ -82,6 +96,9 @@ export async function PUT(request, { params }) {
     } else {
       const body = await request.json().catch(() => ({}));
       if (body.training !== undefined) training = body.training;
+      if (body.training_id !== undefined || body.jenis_training_id !== undefined) {
+        trainingId = body.training_id || body.jenis_training_id || null;
+      }
       if (body.nik !== undefined) nik = body.nik;
       if (body.nama !== undefined) nama = body.nama;
       if (body.kd_toko !== undefined) kd_toko = body.kd_toko;
@@ -93,6 +110,18 @@ export async function PUT(request, { params }) {
 
     if (!nik || !nama) {
       return NextResponse.json({ ok: false, error: 'NIK dan Nama wajib diisi' }, { status: 400 });
+    }
+
+    // Jika trainingId ada, sinkronkan nama training terbaru dari Master
+    if (trainingId) {
+      const { data: trRow } = await supabase
+        .from('training_types')
+        .select('id, name')
+        .eq('id', trainingId)
+        .maybeSingle();
+      if (trRow?.name) {
+        training = trRow.name;
+      }
     }
 
     // Ambil branch data user
@@ -111,6 +140,8 @@ export async function PUT(request, { params }) {
     const oldFileId = currentRec.foto_drive_file_id || null;
     let updatePayload = {
       training,
+      training_id: trainingId,
+      jenis_training_id: trainingId,
       nik,
       nama,
       kd_toko: kd_toko || '-',
@@ -235,7 +266,7 @@ export async function PUT(request, { params }) {
       ok: true,
       message: 'Data tambahan berhasil diperbarui',
       data: updated,
-    });
+    }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     console.error('[API Data Tambahan PUT Error]:', err);
     return NextResponse.json(

@@ -31,8 +31,10 @@ import EditRecordModal from '../../../components/EditRecordModal.js';
 import EmptyState from '../../../components/EmptyState.js';
 import { TableSkeleton } from '../../../components/Skeleton.js';
 import { MONTHS, formatDateIndo } from '../../../lib/config.js';
+import { useJenisTraining } from '../../../lib/useJenisTraining.js';
 
 export default function RiwayatInputPage() {
+  const { trainings, resolveTrainingName } = useJenisTraining();
   const [meta, setMeta] = useState(null);
   const [records, setRecords] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, totalPages: 1 });
@@ -66,7 +68,7 @@ export default function RiwayatInputPage() {
   useEffect(() => {
     async function loadMeta() {
       try {
-        const res = await fetch('/api/meta');
+        const res = await fetch('/api/meta', { cache: 'no-store' });
         const json = await res.json();
         if (json.ok) {
           setMeta(json.data);
@@ -95,7 +97,7 @@ export default function RiwayatInputPage() {
         if (year) params.set('year', year);
         if (hasProof) params.set('has_proof', hasProof);
 
-        const res = await fetch(`/api/records?${params.toString()}`);
+        const res = await fetch(`/api/records?${params.toString()}`, { cache: 'no-store' });
         const json = await res.json();
         if (json.ok) {
           setRecords(json.data || []);
@@ -269,7 +271,7 @@ export default function RiwayatInputPage() {
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:outline-none focus:border-[#0056b3]"
             >
               <option value="">Semua Training</option>
-              {meta?.trainings?.map((t) => (
+              {trainings.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
@@ -403,7 +405,10 @@ export default function RiwayatInputPage() {
                         {/* Jenis Training */}
                         <td className="p-3.5 border-r border-gray-100">
                           <p className="font-bold text-[#0056b3] uppercase">
-                            {r.training_types?.name || '-'}
+                            {resolveTrainingName(
+                              r.jenis_training_id || r.training_id,
+                              r.training_types?.name || r.training || '-'
+                            )}
                           </p>
                           <p className="text-[11px] text-gray-500 mt-0.5">
                             Batch {r.batch || 1}
@@ -531,7 +536,7 @@ export default function RiwayatInputPage() {
           record={editModal.record}
           meta={meta}
           onClose={() => setEditModal({ isOpen: false, record: null, isLoading: false })}
-          onSuccess={() => fetchRecords(pagination.page)}
+          onUpdated={() => fetchRecords(pagination.page)}
         />
       )}
 

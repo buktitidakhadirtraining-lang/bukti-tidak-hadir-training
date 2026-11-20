@@ -4,8 +4,10 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '../../../lib/session.js';
 import { getSupabaseAdmin } from '../../../lib/supabase.js';
 import { getEnv } from '../../../lib/env.js';
+import { sortTrainings } from '../../../lib/training-utils.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
 
 export async function GET(request) {
@@ -25,7 +27,7 @@ export async function GET(request) {
       query = query.eq('is_active', true);
     }
 
-    // Urutkan konsisten: sort_order terlebih dahulu (jika ada), lalu nama abjad
+    // Urutkan konsisten di DB dan pastikan deterministik melalui sortTrainings
     query = query.order('sort_order', { ascending: true, nullsFirst: false }).order('name', { ascending: true });
 
     const { data, error } = await query;
@@ -38,6 +40,8 @@ export async function GET(request) {
       );
     }
 
+    const sortedData = sortTrainings(data || []);
+
     const env = getEnv();
     const publicConfig = {
       supabaseUrl: env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || null,
@@ -46,7 +50,7 @@ export async function GET(request) {
 
     const response = NextResponse.json({
       ok: true,
-      data: data || [],
+      data: sortedData,
       publicConfig,
       timestamp: Date.now(),
     });

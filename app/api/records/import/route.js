@@ -5,7 +5,10 @@ import Papa from 'papaparse';
 import { getSessionFromRequest } from '../../../../lib/session.js';
 import { getSupabaseAdmin } from '../../../../lib/supabase.js';
 import { auditLog } from '../../../../lib/audit.js';
+import { normalizeTrainingName } from '../../../../lib/training-utils.js';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
 
 export async function POST(request) {
@@ -39,7 +42,7 @@ export async function POST(request) {
     // Ambil master data untuk mapping
     const [branchesRes, trainingsRes, reasonsRes] = await Promise.all([
       supabase.from('branches').select('id, name, code'),
-      supabase.from('training_types').select('id, name'),
+      supabase.from('training_types').select('id, name, is_active'),
       supabase.from('absence_reasons').select('id, name'),
     ]);
 
@@ -56,7 +59,10 @@ export async function POST(request) {
 
     const trainingMap = new Map();
     trainings.forEach((t) => {
-      trainingMap.set(t.name.toUpperCase(), t.id);
+      const key = normalizeTrainingName(t.name);
+      if (!trainingMap.has(key) || t.is_active !== false) {
+        trainingMap.set(key, t.id);
+      }
     });
 
     const reasonMap = new Map();
@@ -127,7 +133,7 @@ export async function POST(request) {
         ? [...new Set(rawRows.map((r) => branchMap.get(r.cabang?.toUpperCase())).filter(Boolean))]
         : [session.branchId];
     const candidateTrainings = [
-      ...new Set(rawRows.map((r) => trainingMap.get(r.training?.toUpperCase())).filter(Boolean)),
+      ...new Set(rawRows.map((r) => trainingMap.get(normalizeTrainingName(r.training))).filter(Boolean)),
     ];
     const candidateDates = [
       ...new Set(rawRows.map((r) => r.tanggal).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))),
@@ -179,7 +185,7 @@ export async function POST(request) {
         rowErrors.push('Jabatan wajib diisi');
       }
 
-      const trainingId = trainingMap.get(r.training.toUpperCase());
+      const trainingId = trainingMap.get(normalizeTrainingName(r.training));
       if (!trainingId) {
         rowErrors.push(`Jenis training "${r.training}" tidak ditemukan dalam master training`);
       }
@@ -244,6 +250,7 @@ export async function POST(request) {
           nama_peserta: r.nama_peserta,
           jabatan: r.jabatan,
           training_id: trainingId,
+          jenis_training_id: trainingId,
           batch: batchNum,
           tanggal_pelaksanaan: r.tanggal,
           branch_id: branchId,
@@ -270,11 +277,18 @@ export async function POST(request) {
       );
     }
 
-    // Insert batch ke Supabase
-    const { data: inserted, error: insertErr } = await supabase
+    // Insert batch ke Supabase (retry tanpa jenis_training_id bila kolom belum ada di schema)
+    let { data: inserted, error: insertErr } = await supabase
       .from('absence_records')
       .insert(validRecords)
       .select('id');
+
+    if (insertErr && (insertErr.message?.includes('jenis_training_id') || insertErr.code === 'PGRST204')) {
+      const stripped = validRecords.map(({ jenis_training_id, ...rest }) => rest);
+      const retry = await supabase.from('absence_records').insert(stripped).select('id');
+      inserted = retry.data;
+      insertErr = retry.error;
+    }
 
     if (insertErr) {
       console.error('[Import Insert Error]:', insertErr);

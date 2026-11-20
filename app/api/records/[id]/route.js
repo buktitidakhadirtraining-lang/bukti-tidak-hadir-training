@@ -5,7 +5,15 @@ import { getSupabaseAdmin } from '../../../../lib/supabase.js';
 import { validateEvidenceFile, driveUpload, driveTrash } from '../../../../lib/drive.js';
 import { auditLog } from '../../../../lib/audit.js';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
 
 // PUT: Perbarui catatan ketidakhadiran beserta berkas bukti pengganti (Safe Replace Workflow)
 export async function PUT(request, { params }) {
@@ -42,7 +50,7 @@ export async function PUT(request, { params }) {
     const nik = formData.get('nik')?.toString().trim();
     const nama_peserta = formData.get('nama_peserta')?.toString().trim();
     const jabatan = formData.get('jabatan')?.toString().trim();
-    const training_id = formData.get('training_id')?.toString().trim();
+    const training_id = (formData.get('training_id') || formData.get('jenis_training_id'))?.toString().trim();
     const batch = formData.get('batch')?.toString().trim();
     const tanggal_pelaksanaan = formData.get('tanggal_pelaksanaan')?.toString().trim();
     let branch_id = formData.get('branch_id')?.toString().trim();
@@ -93,6 +101,7 @@ export async function PUT(request, { params }) {
       nama_peserta,
       jabatan,
       training_id,
+      jenis_training_id: training_id,
       batch: parseInt(batch, 10),
       tanggal_pelaksanaan,
       branch_id,
@@ -167,12 +176,8 @@ export async function PUT(request, { params }) {
       updatePayload.file_size_bytes = file.size;
     }
 
-    // 2. Simpan pembaruan ke database
-    const { data: updatedRecord, error: updateErr } = await supabase
-      .from('absence_records')
-      .update(updatePayload)
-      .eq('id', id)
-      .select(`
+    // 2. Simpan pembaruan ke database (dengan retry jika jenis_training_id belum ada di schema)
+    const selectFields = `
         id,
         nik,
         nama_peserta,
@@ -193,8 +198,26 @@ export async function PUT(request, { params }) {
         branches ( id, name, code, drive_bridge_url, drive_bridge_secret_enc ),
         training_types ( id, name ),
         absence_reasons ( id, name )
-      `)
+      `;
+
+    let { data: updatedRecord, error: updateErr } = await supabase
+      .from('absence_records')
+      .update(updatePayload)
+      .eq('id', id)
+      .select(selectFields)
       .single();
+
+    if (updateErr && (updateErr.message?.includes('jenis_training_id') || updateErr.code === 'PGRST204')) {
+      delete updatePayload.jenis_training_id;
+      const retry = await supabase
+        .from('absence_records')
+        .update(updatePayload)
+        .eq('id', id)
+        .select(selectFields)
+        .single();
+      updatedRecord = retry.data;
+      updateErr = retry.error;
+    }
 
     if (updateErr) {
       console.error('[Record Update Error]:', updateErr);
@@ -239,11 +262,14 @@ export async function PUT(request, { params }) {
       newFileId: newlyUploadedFileId,
     });
 
-    return NextResponse.json({
-      ok: true,
-      message: 'Catatan dan berkas bukti berhasil diperbarui',
-      data: updatedRecord,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        message: 'Catatan dan berkas bukti berhasil diperbarui',
+        data: updatedRecord,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err) {
     console.error('[Record PUT Error]:', err);
 

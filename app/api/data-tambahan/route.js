@@ -11,7 +11,14 @@ import {
 import { driveUpload, driveTrash } from '../../../lib/drive.js';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
 
 function formatTambahanFileName(nik, nama, ext = 'jpg') {
   const cleanNik = String(nik || '').trim();
@@ -45,7 +52,7 @@ export async function GET(request) {
 
     const data = await getDataTambahanList({ branchId, role: session.role });
 
-    return NextResponse.json({ ok: true, data });
+    return NextResponse.json({ ok: true, data }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     console.error('[API Data Tambahan GET Error]:', err);
     return NextResponse.json(
@@ -119,6 +126,18 @@ export async function POST(request) {
         .eq('id', userBranchId)
         .maybeSingle();
       branch = bData;
+    }
+
+    // Pastikan nama training sinkron dengan Master terbaru jika trainingId dikirim
+    if (trainingId) {
+      const { data: trRow } = await supabase
+        .from('training_types')
+        .select('id, name')
+        .eq('id', trainingId)
+        .maybeSingle();
+      if (trRow?.name) {
+        training = trRow.name;
+      }
     }
 
     let fotoData = {
@@ -234,7 +253,7 @@ export async function POST(request) {
         ok: true,
         message: 'Data tambahan berhasil disimpan ke database cabang Anda.',
         data: saved,
-      });
+      }, { headers: NO_STORE_HEADERS });
     } catch (insertErr) {
       console.error('[DB Insert Error Data Tambahan]:', insertErr);
       // ROLLBACK: jika simpan DB gagal setelah upload foto ke Drive, hapus file baru dari Drive

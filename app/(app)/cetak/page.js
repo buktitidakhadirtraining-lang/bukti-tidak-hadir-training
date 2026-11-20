@@ -43,6 +43,7 @@ import { photoLoader } from '../../../lib/photo-loader.js';
 import SqlEditorModal from '../../../components/SqlEditorModal.js';
 import PanelUploadTtd from '../../../components/PanelUploadTtd.js';
 import ErrorBoundary from '../../../components/ErrorBoundary.js';
+import { useJenisTraining, normalizeTrainingName } from '../../../lib/useJenisTraining.js';
 
 // Komponen gambar bukti yang tajam, terantre, dan aman
 function ProofImage({ record, recordId, alt, onLoaded, cols = 3 }) {
@@ -58,6 +59,7 @@ function ProofImage({ record, recordId, alt, onLoaded, cols = 3 }) {
 }
 
 export default function CetakPage() {
+  const { trainings: masterTrainings, resolveTrainingName } = useJenisTraining();
   const [meta, setMeta] = useState(null);
   const [records, setRecords] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -171,10 +173,6 @@ export default function CetakPage() {
     };
   }, []);
 
-  const masterTrainings = useMemo(() => {
-    return meta?.trainings || [];
-  }, [meta]);
-
   const storageKeyHorizontal = useMemo(() => {
     return `cetak_horizontal_trainings_${branchId || 'all'}_${meta?.userId || 'default'}`;
   }, [branchId, meta?.userId]);
@@ -219,27 +217,27 @@ export default function CetakPage() {
   const trainingRecordCounts = useMemo(() => {
     const map = new Map();
     (records || []).forEach((r) => {
-      const tId = r.training_id;
-      const tName = (r.training_types?.name || r.training || '').trim().toUpperCase();
+      const tId = r.jenis_training_id || r.training_id;
+      const tName = normalizeTrainingName(r.training_types?.name || r.training || '');
       if (tId) map.set(tId, (map.get(tId) || 0) + 1);
       if (tName) map.set(tName, (map.get(tName) || 0) + 1);
-      const masterT = meta?.trainings?.find(t => t.name.trim().toUpperCase().replace(/\s+/g, ' ') === tName.replace(/\s+/g, ' '));
-      if (masterT) {
+      const masterT = masterTrainings.find((t) => normalizeTrainingName(t.name) === tName);
+      if (masterT && masterT.id !== tId) {
         map.set(masterT.id, (map.get(masterT.id) || 0) + 1);
       }
     });
     return map;
-  }, [records, meta]);
+  }, [records, masterTrainings]);
 
   // Record yang difilter untuk format horizontal
   const filteredHorizontalRecords = useMemo(() => {
     if (printFormat !== 'horizontal') return records;
     return records.filter((r) => {
-      const tId = r.training_id;
-      const tName = (r.training_types?.name || r.training || '').trim().toUpperCase().replace(/\s+/g, ' ');
-      const masterT = meta?.trainings?.find((t) => {
+      const tId = r.jenis_training_id || r.training_id;
+      const tName = normalizeTrainingName(r.training_types?.name || r.training || '');
+      const masterT = masterTrainings.find((t) => {
         if (tId && t.id === tId) return true;
-        return t.name.trim().toUpperCase().replace(/\s+/g, ' ') === tName;
+        return normalizeTrainingName(t.name) === tName;
       });
 
       if (!masterT) {
@@ -250,7 +248,7 @@ export default function CetakPage() {
       if (selectedHorizontalTrainingIds.length === 0) return false;
       return selectedHorizontalTrainingIds.includes(masterT.id);
     });
-  }, [records, printFormat, selectedHorizontalTrainingIds, meta]);
+  }, [records, printFormat, selectedHorizontalTrainingIds, masterTrainings]);
 
   const inputUtamaCount = useMemo(() => {
     return (records || []).filter(r => !r.isTambahan && r.sumber_input !== 'input_utama').length;
@@ -492,7 +490,7 @@ export default function CetakPage() {
   useEffect(() => {
     async function loadMeta() {
       try {
-        const res = await fetch('/api/meta');
+        const res = await fetch('/api/meta', { cache: 'no-store' });
         const json = await res.json();
         if (json.ok) {
           setMeta(json.data);
@@ -519,7 +517,7 @@ export default function CetakPage() {
       if (month) params.set('month', month);
       if (year) params.set('year', year);
 
-      const res = await fetch(`/api/records?${params.toString()}`);
+      const res = await fetch(`/api/records?${params.toString()}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) {
         setRecords(json.data || []);
@@ -540,7 +538,7 @@ export default function CetakPage() {
   const syncSpreadsheet = useCallback(async (manual = false) => {
     if (manual) setIsSyncing(true);
     try {
-      const res = await fetch(`/api/sync-sheets${manual ? '?force=true' : ''}`);
+      const res = await fetch(`/api/sync-sheets${manual ? '?force=true' : ''}`, { cache: 'no-store' });
       const json = await res.json();
       if (json.ok) {
         if (Array.isArray(json.rekap) && json.rekap.length > 0) {
@@ -1775,7 +1773,7 @@ export default function CetakPage() {
   }
 
   const selectedBranchObj = meta?.branches?.find((b) => b.id === branchId);
-  const selectedTrainingObj = meta?.trainings?.find((t) => t.id === trainingId);
+  const selectedTrainingObj = masterTrainings.find((t) => t.id === trainingId);
 
   // Helper url ekspor Excel
   function getExcelExportUrl() {
@@ -1793,15 +1791,15 @@ export default function CetakPage() {
   const trainingGroups = useMemo(() => {
     const recordsToGroup = printFormat === 'horizontal' ? filteredHorizontalRecords : records;
     const groups = recordsToGroup.reduce((acc, r) => {
-      const tId = r.training_id || r.training_types?.id;
+      const tId = r.jenis_training_id || r.training_id || r.training_types?.id;
       const tName = (r.training_types?.name || r.training || 'Tanpa Jenis Training').trim();
 
-      let masterT = meta?.trainings?.find((t) => {
+      let masterT = masterTrainings.find((t) => {
         if (tId && t.id === tId) return true;
-        return t.name.trim().toUpperCase().replace(/\s+/g, ' ') === tName.toUpperCase().replace(/\s+/g, ' ');
+        return normalizeTrainingName(t.name) === normalizeTrainingName(tName);
       });
 
-      const groupKey = masterT ? masterT.id : tName.toUpperCase().replace(/\s+/g, '_');
+      const groupKey = masterT ? masterT.id : normalizeTrainingName(tName).replace(/\s+/g, '_');
       const groupName = masterT ? masterT.name : (tName ? tName.toUpperCase() + ' (belum terpetakan)' : 'Tanpa Jenis Training');
 
       if (!acc[groupKey]) {
@@ -1827,9 +1825,9 @@ export default function CetakPage() {
       return acc;
     }, {});
 
-    // Urutkan sesuai urutan master data di meta?.trainings
+    // Urutkan sesuai urutan master data di training_types
     const masterOrderMap = new Map();
-    (meta?.trainings || []).forEach((t, idx) => {
+    masterTrainings.forEach((t, idx) => {
       masterOrderMap.set(t.id, idx);
       masterOrderMap.set(t.name, idx);
     });
@@ -1840,16 +1838,27 @@ export default function CetakPage() {
       if (orderA !== orderB) return orderA - orderB;
       return a.name.localeCompare(b.name);
     });
-  }, [records, filteredHorizontalRecords, printFormat, meta]);
+  }, [records, filteredHorizontalRecords, printFormat, masterTrainings]);
 
-  // Daftar jenis training unik dari sheet list_tidak_hadir
+  // Daftar jenis training unik dari sheet list_tidak_hadir (disinkronkan dengan urutan Master)
   const uniqueTrainingsFromList = useMemo(() => {
+    const orderMap = new Map();
+    masterTrainings.forEach((t, idx) => {
+      orderMap.set(normalizeTrainingName(t.name), idx);
+    });
+
     const set = new Set();
     for (const item of listTidakHadirData) {
-      if (item.training) set.add(item.training.trim());
+      const resolved = resolveTrainingName(item.jenis_training_id || item.training_id, item.training || '');
+      if (resolved && resolved !== '-') set.add(resolved.trim());
     }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [listTidakHadirData]);
+    return Array.from(set).sort((a, b) => {
+      const idxA = orderMap.get(normalizeTrainingName(a)) ?? Number.MAX_SAFE_INTEGER;
+      const idxB = orderMap.get(normalizeTrainingName(b)) ?? Number.MAX_SAFE_INTEGER;
+      if (idxA !== idxB) return idxA - idxB;
+      return a.localeCompare(b);
+    });
+  }, [listTidakHadirData, masterTrainings, resolveTrainingName]);
 
   // Helper chunk array menjadi kelompok 4 item
   function chunkArray(array, size = 4) {
@@ -2866,7 +2875,7 @@ export default function CetakPage() {
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 font-medium"
                   >
                     <option value="">Semua Training</option>
-                    {meta?.trainings?.map((t) => (
+                    {masterTrainings.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
                       </option>

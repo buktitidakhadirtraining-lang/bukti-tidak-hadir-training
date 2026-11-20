@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { compressImage, formatBytes } from '../lib/compress.js';
 import { validateImageFile } from '../lib/image-validator.js';
 import FileValidationModal from './FileValidationModal.js';
-import { useMasterTrainings } from '../lib/useMasterTrainings.js';
+import { useJenisTraining, normalizeTrainingName } from '../lib/useJenisTraining.js';
 
 export default function EditDataTambahanModal({
   isOpen,
@@ -20,8 +20,9 @@ export default function EditDataTambahanModal({
 }) {
   const fileInputRef = useRef(null);
 
-  const { trainings } = useMasterTrainings();
+  const { trainings } = useJenisTraining();
 
+  const [trainingId, setTrainingId] = useState('');
   const [training, setTraining] = useState('');
   const [nik, setNik] = useState('');
   const [nama, setNama] = useState('');
@@ -43,7 +44,14 @@ export default function EditDataTambahanModal({
 
   useEffect(() => {
     if (record) {
-      setTraining(record.training || 'YFC');
+      const initialId = record.jenis_training_id || record.training_id || '';
+      const initialName = record.training || '';
+      const matched =
+        (initialId && trainings.find((t) => t.id === initialId)) ||
+        (initialName && trainings.find((t) => normalizeTrainingName(t.name) === normalizeTrainingName(initialName)));
+
+      setTrainingId(matched ? matched.id : '');
+      setTraining(matched ? matched.name : initialName);
       setNik(record.nik || '');
       setNama(record.nama || '');
       setKdToko(record.kd_toko || '');
@@ -74,7 +82,7 @@ export default function EditDataTambahanModal({
         setLoadingCurrentPhoto(false);
       }
     }
-  }, [record]);
+  }, [record, trainings]);
 
   if (!isOpen || !record) return null;
 
@@ -125,6 +133,11 @@ export default function EditDataTambahanModal({
       return;
     }
 
+    if (!training.trim()) {
+      toast.error('Jenis Training wajib dipilih');
+      return;
+    }
+
     setSaving(true);
     const toastId = toast.loading('Memperbarui data dan foto...');
 
@@ -133,6 +146,10 @@ export default function EditDataTambahanModal({
     try {
       const formData = new FormData();
       formData.append('no', record.no || '1');
+      if (trainingId && !trainingId.startsWith('__legacy__:')) {
+        formData.append('training_id', trainingId);
+        formData.append('jenis_training_id', trainingId);
+      }
       formData.append('training', training.trim());
       formData.append('nik', nik.trim());
       formData.append('nama', nama.trim());
@@ -200,15 +217,27 @@ export default function EditDataTambahanModal({
               Jenis Training <span className="text-red-500">*</span>
             </label>
             <select
-              value={training}
-              onChange={(e) => setTraining(e.target.value)}
+              value={trainingId || (training ? `__legacy__:${training}` : '')}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.startsWith('__legacy__:')) {
+                  setTrainingId('');
+                  setTraining(val.slice('__legacy__:'.length));
+                } else {
+                  setTrainingId(val);
+                  const found = trainings.find((t) => t.id === val);
+                  setTraining(found ? found.name : '');
+                }
+              }}
+              required
               className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-[#0056b3]"
             >
-              {training && !trainings.some((t) => t.name.toUpperCase() === training.toUpperCase()) && (
-                <option value={training}>{training}</option>
+              <option value="">Pilih Jenis Training</option>
+              {training && !trainings.some((t) => normalizeTrainingName(t.name) === normalizeTrainingName(training)) && (
+                <option value={`__legacy__:${training}`}>{training} (Nama Lama)</option>
               )}
               {trainings.map((t) => (
-                <option key={t.id} value={t.name}>
+                <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
               ))}
